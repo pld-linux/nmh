@@ -5,13 +5,14 @@ Version:	0.27
 Release:	9
 Copyright:	freeware
 Group:		Applications/Mail
+Group(de):	Applikationen/Post
 Group(pl):	Aplikacje/Poczta
 Group(pt):	Aplicações/Correio Eletrônico
 Source0:	ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
-Patch0:		nmh-0.24-config.patch
-Patch1:		nmh-0.27-buildroot.patch
-Patch2:		nmh-0.27-security.patch
-Patch3:		nmh-0.27-compat21.patch
+Patch0:		%{name}-0.24-config.patch
+Patch1:		%{name}-0.27-buildroot.patch
+Patch2:		%{name}-0.27-security.patch
+Patch3:		%{name}-0.27-compat21.patch
 Requires:	smtpdaemon
 Obsoletes:	mh
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
@@ -39,8 +40,7 @@ interface for it--nmh only has a command line interface.
 
 %build
 LIBS="-lgdbm"
-LDFLAGS="-s"
-export LIBS LDFLAGS
+export LIBS
 %configure \
 	--with-editor=/bin/vi
 
@@ -53,7 +53,7 @@ rm -rf $RPM_BUILD_ROOT
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/*.old
 
 gzip -9nf COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION \
-	ZSH.COMPLETION $RPM_BUILD_ROOT%{_mandir}/*/*
+	ZSH.COMPLETION
 
 %clean
 rm -rf $RPM_BUILD_ROOT
