@@ -6,9 +6,6 @@ Version:	1.0.4
 Release:	3
 License:	freeware
 Group:		Applications/Mail
-Group(de):	Applikationen/Post
-Group(pl):	Aplikacje/Poczta
-Group(pt):	Aplicações/Correio Eletrônico
 Source0:	ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
 Patch0:		%{name}-1.0.3-config.patch
 Patch1:		%{name}-1.0.3-buildroot.patch
