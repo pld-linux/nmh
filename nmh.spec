@@ -3,7 +3,7 @@ Summary(pl):	System obs³ugi poczty z interfejsem z linii poleceñ
 Name:		nmh
 Provides:	mh
 Version:	1.0.4
-Release:	4
+Release:	5
 License:	Freeware
 Group:		Applications/Mail
 Source0:	ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
@@ -12,6 +12,7 @@ Patch1:		%{name}-buildroot.patch
 Patch2:		%{name}-compat21.patch
 Patch3:		%{name}-bug7246.patch
 Requires:	smtpdaemon
+Requires:	/bin/vi
 Obsoletes:	mh
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
@@ -61,8 +62,6 @@ rm -rf $RPM_BUILD_ROOT
 
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/*.old
 
-gzip -9nf COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION
-
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -94,8 +93,7 @@ fi
 
 %files
 %defattr(644,root,root,755)
-%doc {COPYRIGHT,DIFFERENCES,FAQ,MAIL.FILTERING,README}.gz
-%doc {TODO,VERSION,ZSH.COMPLETION}.gz
+%doc COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION
 %dir %{_libdir}
 %dir %{_sysconfdir}
 %config %{_sysconfdir}/*
