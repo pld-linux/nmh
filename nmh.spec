@@ -12,7 +12,7 @@ Patch2:		nmh-0.27-security.patch
 Patch3:		nmh-0.27-compat21.patch
 Requires:	smtpdaemon
 Obsoletes:	mh
-Buildroot:	/tmp/%{name}-%{version}-root
+BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
 Nmh is an email system based on the MH email system and is intended
