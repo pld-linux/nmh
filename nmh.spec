@@ -2,7 +2,7 @@ Summary:	A capable mail handling system with a command line interface
 Name:		nmh
 Provides:	mh
 Version:	1.0.4
-Release:	1
+Release:	2
 Copyright:	freeware
 Group:		Applications/Mail
 Group(de):	Applikationen/Post
@@ -11,9 +11,8 @@ Group(pt):	Aplicações/Correio Eletrônico
 Source0:	ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
 Patch0:		%{name}-1.0.3-config.patch
 Patch1:		%{name}-1.0.3-buildroot.patch
-#Patch2:		%{name}-0.27-security.patch
-Patch3:		%{name}-1.0.3-compat21.patch
-Patch4:		%{name}-1.0.4-bug7246.patch
+Patch2:		%{name}-1.0.3-compat21.patch
+Patch3:		%{name}-1.0.4-bug7246.patch
 Requires:	smtpdaemon
 Obsoletes:	mh
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
@@ -36,9 +35,8 @@ interface for it--nmh only has a command line interface.
 %setup -q
 %patch0 -p1
 %patch1 -p1
-#%patch2 -p1
+%patch2 -p1
 %patch3 -p1
-%patch4 -p1
 
 %build
 LIBS="-lgdbm"
