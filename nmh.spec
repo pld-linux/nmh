@@ -1,18 +1,18 @@
-Summary: A capable mail handling system with a command line interface.
-Name: nmh
-Obsoletes: mh
-Provides: mh
-Version: 0.27
-Release: 8
-Requires: smtpdaemon
-Copyright: freeware
-Group: Applications/Internet
-Source0: ftp://ftp.math.gatech.edu/pub/nmh/nmh-0.27.tar.gz
-Patch0: nmh-0.24-config.patch
-Patch1: nmh-0.27-buildroot.patch
-Patch2: nmh-0.27-security.patch
-Patch3: nmh-0.27-compat21.patch
-Buildroot: /var/tmp/%{name}-root
+Summary:	A capable mail handling system with a command line interface.
+Name:		nmh
+Provides:	mh
+Version:	0.27
+Release:	9
+Copyright:	freeware
+Group:		Applications/Mail
+Source:		ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
+Patch0:		nmh-0.24-config.patch
+Patch1:		nmh-0.27-buildroot.patch
+Patch2:		nmh-0.27-security.patch
+Patch3:		nmh-0.27-compat21.patch
+Requires:	smtpdaemon
+Obsoletes:	mh
+Buildroot:	/tmp/%{name}-%{version}-root
 
 %description
 Nmh is an email system based on the MH email system and is intended
@@ -31,60 +31,65 @@ nmh.
 
 %prep
 %setup -q
-%patch0 -p1 -b .config
-%patch1 -p1 -b .buildroot
-%patch2 -p1 -b .security
-%patch3 -p1 -b .compat21
+%patch0 -p1
+%patch1 -p1
+%patch2 -p1
+%patch3 -p1
 
 %build
-LIBS=-lgdbm ./configure --prefix=/usr \
-			--exec-prefix=/usr \
-			--bindir=/usr/bin \
-			--libdir=/usr/lib/nmh \
-			--sysconfdir=/etc/nmh \
-			--with-editor=/bin/vi
+LIBS=-lgdbm CFLAGS="$RPM_OPT_FLAGS" ./configure \
+	--prefix=%{_prefix} \
+	--exec-prefix=%{_prefix} \
+	--bindir=%{_bindir} \
+	--mandir=%{_mandir} \
+	--libdir=%{_libdir}/nmh \
+	--sysconfdir=/etc/nmh \
+	--with-editor=/bin/vi
 
 make
 
 %install
-DESTDIR=$RPM_BUILD_ROOT make install
-strip `file $RPM_BUILD_ROOT/usr/bin/* | grep ELF | cut -d':' -f 1`
+make install DESTDIR=$RPM_BUILD_ROOT
 
-# XXX unnecessary because DOT_LOCKING is disabled
-# chown root.mail $RPM_BUILD_ROOT/usr/bin/inc
-# chmod 2755 $RPM_BUILD_ROOT/usr/bin/inc
+rm -f $RPM_BUILD_ROOT/etc/nmh/*.old
+
+strip --strip-unneeded $RPM_BUILD_ROOT%{_bindir}/* || :
+
+gzip -9nf COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION \
+	ZSH.COMPLETION $RPM_BUILD_ROOT%{_mandir}/*/*
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %post
-if [ ! -d /usr/bin/mh -a ! -L /usr/bin/mh ] ; then
-    ln -s . /usr/bin/mh
+if [ ! -d %{_bindir}/mh -a ! -L %{_bindir}/mh ] ; then
+    ln -s . %{_bindir}/mh
 fi
-if [ ! -d /usr/lib/mh -a ! -L /usr/lib/mh ] ; then
-    ln -s nmh /usr/lib/mh
+if [ ! -d %{_libdir}/mh -a ! -L %{_libdir}/mh ] ; then
+    ln -s nmh %{_libdir}/mh
 fi
 
 %triggerpostun -- mh, nmh <= 0.27-7
-if [ ! -d /usr/bin/mh -a ! -L /usr/bin/mh ] ; then
-    ln -s . /usr/bin/mh
+if [ ! -d %{_bindir}/mh -a ! -L %{_bindir}/mh ] ; then
+    ln -s . %{_bindir}/mh
 fi
-if [ ! -d /usr/lib/mh -a ! -L /usr/lib/mh ] ; then
-    ln -s nmh /usr/lib/mh
+if [ ! -d %{_libdir}/mh -a ! -L %{_libdir}/mh ] ; then
+    ln -s nmh %{_libdir}/mh
 fi
 
 %preun
 if [ $1 = 0 ]; then
-    [ ! -L /usr/bin/mh ] || rm -f /usr/bin/mh
-    [ ! -L /usr/lib/mh ] || rm -f /usr/lib/mh
+    [ ! -L %{_bindir}/mh ] || rm -f %{_bindir}/mh
+    [ ! -L %{_libdir}/mh ] || rm -f %{_libdir}/mh
 fi
 
 %files
-%defattr(-,root,root)
-%doc COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION ZSH.COMPLETION
-%dir /usr/lib/nmh
+%defattr(644,root,root,755)
+%doc {COPYRIGHT,DIFFERENCES,FAQ,MAIL.FILTERING,README}.gz
+%doc {TODO,VERSION,ZSH.COMPLETION}.gz
+%dir %{_libdir}/nmh
 %dir /etc/nmh
 %config /etc/nmh/*
-/usr/bin/*
-/usr/lib/nmh/*
-/usr/man/*/*
+%attr(755,root,root) %{_bindir}/*
+%attr(755,root,root) %{_libdir}/nmh/*
+%{_mandir}/*/*
