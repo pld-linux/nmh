@@ -1,0 +1,24 @@
+--- nmh-1.0.3/mts/smtp/smtp.c.compat21	Sun Sep 26 13:45:56 1999
++++ nmh-1.0.3/mts/smtp/smtp.c	Mon Feb 28 14:29:34 2000
+@@ -1026,13 +1026,19 @@
+ static int
+ sm_werror (void)
+ {
++
++#ifdef MPOP
+     sm_reply.length =
+ 	strlen (strcpy (sm_reply.text, sm_wfp == NULL ? "no socket opened"
+ 	    : sm_alarmed ? "write to socket timed out"
+-#ifdef MPOP
+ 	    : sm_ispool ? "error writing to spool file"
+-#endif
+ 	    : "error writing to socket"));
++#else
++    sm_reply.length =
++	strlen (strcpy (sm_reply.text, sm_wfp == NULL ? "no socket opened"
++	    : sm_alarmed ? "write to socket timed out"
++	    : "error writing to socket"));
++#endif
+ 
+     return (sm_reply.code = NOTOK);
+ }
