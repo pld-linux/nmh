@@ -1,0 +1,10 @@
+--- nmh-1.0.4/uip/sortm.c.bug7246	Wed Aug 16 12:58:07 2000
++++ nmh-1.0.4/uip/sortm.c	Wed Aug 16 12:58:55 2000
+@@ -441,6 +441,7 @@
+ 			else {
+ 			    if (isalnum(c))
+ 				*cp2++ = isupper(c) ? tolower(c) : c;
++			    cp++;
+ 			    break;
+ 			}
+ 		    }
