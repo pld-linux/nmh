@@ -4,7 +4,7 @@ Name:		nmh
 Provides:	mh
 Version:	1.0.4
 Release:	3
-License:	freeware
+License:	Freeware
 Group:		Applications/Mail
 Source0:	ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
 Patch0:		%{name}-1.0.3-config.patch
