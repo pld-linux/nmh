@@ -46,7 +46,7 @@ LIBS=-lgdbm CFLAGS="$RPM_OPT_FLAGS" ./configure \
 	--sysconfdir=/etc/nmh \
 	--with-editor=/bin/vi
 
-make
+%{__make}
 
 %install
 %{__make} install DESTDIR=$RPM_BUILD_ROOT
