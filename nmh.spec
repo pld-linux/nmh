@@ -1,9 +1,10 @@
 Summary:	A capable mail handling system with a command line interface
+Summary(pl):	System obs³ugi poczty z interfejsem z linii poleceñ
 Name:		nmh
 Provides:	mh
 Version:	1.0.4
 Release:	2
-Copyright:	freeware
+License:	freeware
 Group:		Applications/Mail
 Group(de):	Applikationen/Post
 Group(pl):	Aplikacje/Poczta
@@ -30,6 +31,17 @@ intersperse nmh commands with other shell commands or write custom
 scripts which utilize nmh commands. If you want to use nmh as a true
 email user agent, you'll want to also install exmh to provide a user
 interface for it--nmh only has a command line interface.
+
+%description -l pl
+Nmh jest systemem pocztowym bazuj±cym na systemie MH, w wiêkoszo¶ci
+kompatybilnym i mog±cym zast±piæ MH. Nmh nie jest pojedynczym
+programem - sk³ada siê z wielu prostych programów s³u¿±cych do jednej
+czynno¶ci (wysy³ania, odbierania, zapisywania, odczytywania...). Mo¿na
+swobodnie umieszczaæ polecenia nmh miêdzy innymi poleceniami pow³oki
+lub pisaæ skrypty korzystaj±ce z poleceñ nmh. Je¶li chcesz u¿ywaæ nmh
+jako prawdziwego programu pocztowego, pomy¶l o zainstalowaniu exmh,
+daj±cego interfejs u¿ytkownika - samo nmh mo¿na obs³ugiwaæ tylko z
+linii poleceñ.
 
 %prep
 %setup -q
@@ -60,10 +72,10 @@ rm -rf $RPM_BUILD_ROOT
 
 %post
 if [ ! -d %{_bindir}/mh -a ! -L %{_bindir}/mh ] ; then
-	ln -s . %{_bindir}/mh
+	ln -sf . %{_bindir}/mh
 fi
 if [ ! -d %{_usrlibdir}/mh -a ! -L %{_usrlibdir}/mh ] ; then
-	ln -s nmh %{_usrlibdir}/mh
+	ln -sf nmh %{_usrlibdir}/mh
 fi
 if [ -d /etc/smrsh -a ! -L /etc/smrsh/slocal ] ; then
 	ln -sf %{_libdir}/slocal /etc/smrsh/slocal
@@ -71,19 +83,18 @@ fi
 
 %triggerpostun -- mh, nmh <= 0.27-7
 if [ ! -d %{_bindir}/mh -a ! -L %{_bindir}/mh ] ; then
-	ln -s . %{_bindir}/mh
+	ln -sf . %{_bindir}/mh
 fi
 if [ ! -d %{_usrlibdir}/mh -a ! -L %{_usrlibdir}/mh ] ; then
-	ln -s nmh %{_usrlibdir}/mh
+	ln -sf nmh %{_usrlibdir}/mh
 fi
 
 %preun
-if [ $1 = 0 ]; then
+if [ "$1" = "0" ]; then
 	[ ! -L %{_bindir}/mh ] || rm -f %{_bindir}/mh
 	[ ! -L %{_usrlibdir}/mh ] || rm -f %{_usrlibdir}/mh
 	[ ! -d /etc/smrsh -a -L /etc/smrsh/slocal ] || rm -f /etc/smrsh/slocal
 fi
-
 
 %files
 %defattr(644,root,root,755)
