@@ -3,7 +3,7 @@ Summary(pl):	System obs³ugi poczty z interfejsem z linii poleceñ
 Name:		nmh
 Provides:	mh
 Version:	1.0.4
-Release:	2
+Release:	3
 License:	freeware
 Group:		Applications/Mail
 Group(de):	Applikationen/Post
@@ -60,7 +60,7 @@ export LIBS
 
 %install
 rm -rf $RPM_BUILD_ROOT
-%{__make} install DESTDIR=$RPM_BUILD_ROOT
+%{__make} install DESTDIR=$RPM_BUILD_ROOT SETGID_MAIL=
 
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/*.old
 
