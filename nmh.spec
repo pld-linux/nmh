@@ -1,9 +1,12 @@
+# TODO:
+# - update to 1.1RC1 - project moved to savannah.nongnu.org
+#
 Summary:	A capable mail handling system with a command line interface
 Summary(pl):	System obs³ugi poczty z interfejsem z linii poleceñ
 Name:		nmh
 Provides:	mh
 Version:	1.0.4
-Release:	5
+Release:	6
 License:	Freeware
 Group:		Applications/Mail
 Source0:	ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
@@ -12,12 +15,14 @@ Patch0:		%{name}-config.patch
 Patch1:		%{name}-buildroot.patch
 Patch2:		%{name}-compat21.patch
 Patch3:		%{name}-bug7246.patch
+BuildRequires:	gdbm-devel
+BuildRequires:	ncurses-devel
 Requires:	smtpdaemon
 Requires:	/bin/vi
 Obsoletes:	mh
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
-%define		_libdir		%{_prefix}/lib/nmh
+%define		_nmhlibdir	%{_libdir}/nmh
 %define		_sysconfdir	/etc/nmh
 
 %description
@@ -50,12 +55,10 @@ linii poleceñ.
 %patch3 -p1
 
 %build
-LIBS="-lgdbm"
-export LIBS
 %configure2_13 \
 	--with-editor=/bin/vi
 
-%{__make}
+%{__make} LIBS="-lgdbm -lgdbm_compat"
 
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -70,25 +73,25 @@ rm -rf $RPM_BUILD_ROOT
 if [ ! -d %{_bindir}/mh -a ! -L %{_bindir}/mh ] ; then
 	ln -sf . %{_bindir}/mh
 fi
-if [ ! -d %{_usrlibdir}/mh -a ! -L %{_usrlibdir}/mh ] ; then
-	ln -sf nmh %{_usrlibdir}/mh
+if [ ! -d %{_libdir}/mh -a ! -L %{_libdir}/mh ] ; then
+	ln -sf nmh %{_libdir}/mh
 fi
 if [ -d /etc/smrsh -a ! -L /etc/smrsh/slocal ] ; then
-	ln -sf %{_libdir}/slocal /etc/smrsh/slocal
+	ln -sf %{_nmhlibdir}/slocal /etc/smrsh/slocal
 fi
 
 %triggerpostun -- mh, nmh <= 0.27-7
 if [ ! -d %{_bindir}/mh -a ! -L %{_bindir}/mh ] ; then
 	ln -sf . %{_bindir}/mh
 fi
-if [ ! -d %{_usrlibdir}/mh -a ! -L %{_usrlibdir}/mh ] ; then
-	ln -sf nmh %{_usrlibdir}/mh
+if [ ! -d %{_libdir}/mh -a ! -L %{_libdir}/mh ] ; then
+	ln -sf nmh %{_libdir}/mh
 fi
 
 %preun
 if [ "$1" = "0" ]; then
 	[ ! -L %{_bindir}/mh ] || rm -f %{_bindir}/mh
-	[ ! -L %{_usrlibdir}/mh ] || rm -f %{_usrlibdir}/mh
+	[ ! -L %{_libdir}/mh ] || rm -f %{_libdir}/mh
 	[ ! -d /etc/smrsh -a -L /etc/smrsh/slocal ] || rm -f /etc/smrsh/slocal
 fi
 
