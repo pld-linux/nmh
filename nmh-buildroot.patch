@@ -33,10 +33,10 @@
  # install misc support binaries
  install-misc:
 -	$(top_srcdir)/mkinstalldirs $(libdir)
-+	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(libdir)
++	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(libdir)/nmh
  	for misc in $(MISC); do \
 -	  $(INSTALL_PROGRAM) $$misc $(libdir)/$$misc; \
-+	  $(INSTALL_PROGRAM) $$misc $(DESTDIR)/$(libdir)/$$misc; \
++	  $(INSTALL_PROGRAM) $$misc $(DESTDIR)/$(libdir)/nmh/$$misc; \
  	done
  
  # install commands with special installation needs (thus no $(SCMDS) use here)
