@@ -49,7 +49,7 @@ LIBS=-lgdbm CFLAGS="$RPM_OPT_FLAGS" ./configure \
 make
 
 %install
-make install DESTDIR=$RPM_BUILD_ROOT
+%{__make} install DESTDIR=$RPM_BUILD_ROOT
 
 rm -f $RPM_BUILD_ROOT/etc/nmh/*.old
 
