@@ -1,0 +1,47 @@
+--- nmh-0.24/config.h.in.old	Wed Mar 25 10:48:31 1998
++++ nmh-0.24/config.h.in	Wed Mar 25 10:49:28 1998
+@@ -29,7 +29,7 @@
+ /*
+  *  Linux
+  */
+-/* #define LINUX_STDIO  1 */
++#define LINUX_STDIO  1
+ 
+ /*
+  *  FreeBSD 2.x
+@@ -59,7 +59,7 @@
+  * group and add the setgid bit to `inc' manually after
+  * installation.
+  */
+-/* #define MAILGROUP  1 */
++#define MAILGROUP  1
+ 
+ /*
+  * Turn on locale (setlocale) support
+@@ -72,8 +72,8 @@
+  * other programs which may modify your maildrops.
+  * Currently you can only use one type.
+  */
+-#define DOT_LOCKING   1
+-/* #define FCNTL_LOCKING 1 */
++/* #define DOT_LOCKING   1 */
++#define FCNTL_LOCKING 1
+ /* #define LOCKF_LOCKING 1 */
+ /* #define FLOCK_LOCKING 1 */
+ 
+@@ -133,13 +133,13 @@
+  * that nmh will use.  Make sure this is defined in your
+  * /etc/services file (or its NIS/NIS+ eqivalent).
+  */
+-#define POPSERVICE "pop3"
++#define POPSERVICE "pop-3"
+ 
+ /*
+  * Define the default creation modes for folders and messages.
+  */
+ #define DEFAULT_FOLDER_MODE "0700"
+-#define DEFAULT_MESSAGE_MODE "0644"
++#define DEFAULT_MESSAGE_MODE "0600"
+ 
+ /*
+  * The prefix to use when messages are "removed" by rmm.

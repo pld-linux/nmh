@@ -1,0 +1,52 @@
+--- nmh-0.27/zotnet/mf/mf.c.compat21	Sun Jan 10 13:39:43 1999
++++ nmh-0.27/zotnet/mf/mf.c	Sun Jan 10 13:39:43 1999
+@@ -31,7 +31,9 @@
+     register char *p;
+ 
+     if (!s) {
++#if !((__GLIBC__ == 2) && (__GLIBC_MINOR__ == 1))
+ 	_cleanup();
++#endif
+ 	abort();
+ 	for(;;)
+ 	    pause();
+--- nmh-0.27/mts/smtp/smtp.c.compat21	Sun Jan 10 13:55:50 1999
++++ nmh-0.27/mts/smtp/smtp.c	Sun Jan 10 13:56:40 1999
+@@ -999,13 +999,19 @@
+ static int
+ sm_werror (void)
+ {
++
++#ifdef MPOP
+     sm_reply.length =
+ 	strlen (strcpy (sm_reply.text, sm_wfp == NULL ? "no socket opened"
+ 	    : sm_alarmed ? "write to socket timed out"
+-#ifdef MPOP
+ 	    : sm_ispool ? "error writing to spool file"
+-#endif
+ 	    : "error writing to socket"));
++#else
++    sm_reply.length =
++	strlen (strcpy (sm_reply.text, sm_wfp == NULL ? "no socket opened"
++	    : sm_alarmed ? "write to socket timed out"
++	    : "error writing to socket"));
++#endif
+ 
+     return (sm_reply.code = NOTOK);
+ }
+--- nmh-0.27/uip/slocal.c.compat21	Sun Jan 10 13:39:43 1999
++++ nmh-0.27/uip/slocal.c	Sun Jan 10 13:39:43 1999
+@@ -27,7 +27,13 @@
+ #include <pwd.h>
+ #include <signal.h>
+ #include <sys/ioctl.h>
++
++#if ((__GLIBC__ == 2) && (__GLIBC_MINOR__ >= 1))
++#include <db1/ndbm.h>
++#else
+ #include <ndbm.h>
++#endif
++
+ #include <fcntl.h>
+ 
+ #include <utmp.h>

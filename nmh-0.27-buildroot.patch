@@ -1,0 +1,117 @@
+--- nmh-0.27/uip/Makefile.in.buildroot	Mon Jun 22 23:52:17 1998
++++ nmh-0.27/uip/Makefile.in	Sat Jul 18 13:38:03 1998
+@@ -225,27 +225,27 @@
+ 
+ # install commands
+ install-cmds:
+-	$(top_srcdir)/mkinstalldirs $(bindir)
++	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(bindir)
+ 	for cmd in $(CMDS); do \
+-	  $(INSTALL_PROGRAM) $$cmd $(bindir)/$$cmd; \
++	  $(INSTALL_PROGRAM) $$cmd $(DESTDIR)/$(bindir)/$$cmd; \
+ 	done
+ 
+ # install links
+ install-lcmds:
+-	rm -f $(bindir)/flists
+-	rm -f $(bindir)/folders
+-	rm -f $(bindir)/prev
+-	rm -f $(bindir)/next
+-	$(LN) $(bindir)/flist  $(bindir)/flists
+-	$(LN) $(bindir)/folder $(bindir)/folders
+-	$(LN) $(bindir)/show   $(bindir)/prev
+-	$(LN) $(bindir)/show   $(bindir)/next
++	rm -f $(DESTDIR)/$(bindir)/flists
++	rm -f $(DESTDIR)/$(bindir)/folders
++	rm -f $(DESTDIR)/$(bindir)/prev
++	rm -f $(DESTDIR)/$(bindir)/next
++	$(LN) $(DESTDIR)/$(bindir)/flist  $(DESTDIR)/$(bindir)/flists
++	$(LN) $(DESTDIR)/$(bindir)/folder $(DESTDIR)/$(bindir)/folders
++	$(LN) $(DESTDIR)/$(bindir)/show   $(DESTDIR)/$(bindir)/prev
++	$(LN) $(DESTDIR)/$(bindir)/show   $(DESTDIR)/$(bindir)/next
+ 
+ # install misc support binaries
+ install-misc:
+-	$(top_srcdir)/mkinstalldirs $(libdir)
++	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(libdir)
+ 	for misc in $(MISC); do \
+-	  $(INSTALL_PROGRAM) $$misc $(libdir)/$$misc; \
++	  $(INSTALL_PROGRAM) $$misc $(DESTDIR)/$(libdir)/$$misc; \
+ 	done
+ 
+ uninstall:
+--- nmh-0.27/etc/Makefile.in.buildroot	Sat Jul 18 13:46:11 1998
++++ nmh-0.27/etc/Makefile.in	Sat Jul 18 13:48:51 1998
+@@ -71,24 +71,24 @@
+ install: install-files install-scripts
+ 
+ install-files:
+-	$(top_srcdir)/mkinstalldirs $(etcdir)
++	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(etcdir)
+ 	for file in $(DIST_FILES); do \
+-	  if [ -f $(etcdir)/$$file ]; then \
+-	    mv $(etcdir)/$$file $(etcdir)/$$file.old; \
++	  if [ -f $(DESTDIR)/$(etcdir)/$$file ]; then \
++	    mv $(DESTDIR)/$(etcdir)/$$file $(DESTDIR)/$(etcdir)/$$file.old; \
+ 	  fi; \
+-	  $(INSTALL_DATA) $(srcdir)/$$file $(etcdir)/$$file; \
++	  $(INSTALL_DATA) $(srcdir)/$$file $(DESTDIR)/$(etcdir)/$$file; \
+ 	done
+ 	for file in $(GEN_FILES); do \
+-	  if [ -f $(etcdir)/$$file ]; then \
+-	    mv $(etcdir)/$$file $(etcdir)/$$file.old; \
++	  if [ -f $(DESTDIR)/$(etcdir)/$$file ]; then \
++	    mv $(DESTDIR)/$(etcdir)/$$file $(DESTDIR)/$(etcdir)/$$file.old; \
+ 	  fi; \
+-	  $(INSTALL_DATA) $$file $(etcdir)/$$file; \
++	  $(INSTALL_DATA) $$file $(DESTDIR)/$(etcdir)/$$file; \
+ 	done
+ 
+ install-scripts:
+-	$(top_srcdir)/mkinstalldirs $(libdir)
++	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(libdir)
+ 	for script in $(SCRIPTS); do \
+-	  $(INSTALL_PROGRAM) $(srcdir)/$$script $(libdir)/$$script; \
++	  $(INSTALL_PROGRAM) $(srcdir)/$$script $(DESTDIR)/$(libdir)/$$script; \
+ 	done
+ 
+ uninstall: uninstall-files uninstall-scripts
+--- nmh-0.27/man/Makefile.in.buildroot	Sat Jul 18 13:51:36 1998
++++ nmh-0.27/man/Makefile.in	Sat Jul 18 13:53:07 1998
+@@ -127,28 +127,28 @@
+ 
+ # install the include file for man pages
+ install-hdr:
+-	$(top_srcdir)/mkinstalldirs $(etcdir)
+-	$(INSTALL_DATA) tmac.h $(etcdir)/tmac.h
++	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(etcdir)
++	$(INSTALL_DATA) tmac.h $(DESTDIR)/$(etcdir)/tmac.h
+ 
+ # install the man pages in man1
+ install-man1:
+-	$(top_srcdir)/mkinstalldirs $(mandir)/man$(manext1)
++	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(mandir)/man$(manext1)
+ 	for file in $(MAN1); do \
+-	  $(INSTALL_DATA) $$file $(mandir)/man$(manext1) ; \
++	  $(INSTALL_DATA) $$file $(DESTDIR)/$(mandir)/man$(manext1) ; \
+ 	done
+ 
+ # install the man pages in man5
+ install-man5:
+-	$(top_srcdir)/mkinstalldirs $(mandir)/man$(manext5)
++	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(mandir)/man$(manext5)
+ 	for file in $(MAN5); do \
+-	  $(INSTALL_DATA) $$file $(mandir)/man$(manext5) ; \
++	  $(INSTALL_DATA) $$file $(DESTDIR)/$(mandir)/man$(manext5) ; \
+ 	done
+ 
+ # install the man pages in man8
+ install-man8:
+-	$(top_srcdir)/mkinstalldirs $(mandir)/man$(manext8)
++	$(top_srcdir)/mkinstalldirs $(DESTDIR)/$(mandir)/man$(manext8)
+ 	for file in $(MAN8); do \
+-	  $(INSTALL_DATA) $$file $(mandir)/man$(manext8) ; \
++	  $(INSTALL_DATA) $$file $(DESTDIR)/$(mandir)/man$(manext8) ; \
+ 	done
+ 
+ # ========= UNINSTALL TARGETS =========

@@ -1,0 +1,5895 @@
+--- nmh-0.27/h/prototypes.h.security	Mon Jun 29 00:07:25 1998
++++ nmh-0.27/h/prototypes.h	Sat Jul 18 14:04:47 1998
+@@ -44,6 +44,7 @@
+ void context_save (void);
+ char *copy (char *, char *);
+ char **copyip (char **, char **);
++char **copyip_n (char **, char **, int);
+ void cpydata (int, int, char *, char *);
+ void cpydgst (int, int, char *, char *);
+ int decode_rfc2047 (char *, char *);
+--- nmh-0.27/sbr/copyip.c.security	Sun Jan  4 12:07:01 1998
++++ nmh-0.27/sbr/copyip.c	Sat Jul 18 14:04:47 1998
+@@ -17,3 +17,11 @@
+ 
+     return q;
+ }
++
++char **copyip_n(char **p, char **q, int n)
++{
++	while(*p && --n)
++		*q++=*p++;
++	*q=NULL;
++	return q;
++}
+--- nmh-0.27/sbr/fmt_scan.c.security	Thu May 21 03:31:13 1998
++++ nmh-0.27/sbr/fmt_scan.c	Sat Jul 18 14:04:47 1998
+@@ -237,9 +237,9 @@
+ 	return NULL;
+ 
+     if (get_x400_comp (mbox, "/G=", given))
+-	sprintf (buffer, "%s %s", given, surname);
++	snprintf (buffer,  BUFSIZ, "%s %s", given, surname);
+     else
+-	strcpy (buffer, surname);
++	snprintf (buffer, BUFSIZ, "%s", surname);
+ 
+     return buffer;
+ }
+@@ -254,7 +254,7 @@
+ 	    || !(cp = strchr(mbox += idx + strlen (key), '/')))
+ 	return 0;
+ 
+-    sprintf (buffer, "%*.*s", cp - mbox, cp - mbox, mbox);
++    snprintf (buffer, BUFSIZ,  "%*.*s", cp - mbox, cp - mbox, mbox);
+     return 1;
+ }
+ 
+@@ -446,7 +446,7 @@
+ 	    if (str) {
+ 		    char *xp;
+ 
+-		    strcpy(buffer, str);
++		    strncpy(buffer, str, BUFSIZ);
+ 		    str = buffer;
+ 		    while (isspace(*str))
+ 			    str++;
+@@ -631,7 +631,7 @@
+ 		goto unfriendly;
+ 	    if ((str = mn->m_pers) == NULL)
+ 	        if ((str = mn->m_note)) {
+-	            strcpy (buffer, str);
++	            strncpy (buffer, str, BUFSIZ);
+ 	            str = buffer;
+ 	            if (*str == '(')
+ 	            	str++;
+@@ -651,12 +651,12 @@
+ 			str = mn->m_mbox;
+ 			break;
+ 		    case UUCPHOST:
+-			sprintf (buffer, "%s!%s", mn->m_host, mn->m_mbox);
++			snprintf (buffer, BUFSIZ, "%s!%s", mn->m_host, mn->m_mbox);
+ 			str = buffer;
+ 			break;
+ 		    default:
+ 			if (mn->m_mbox) {
+-			    sprintf (buffer, "%s@%s", mn->m_mbox, mn->m_host);
++			    snprintf (buffer, BUFSIZ, "%s@%s", mn->m_mbox, mn->m_host);
+ 			    str= buffer;
+ 			}
+ 			else
+--- nmh-0.27/sbr/folder_delmsgs.c.security	Sun Jan  4 12:46:47 1998
++++ nmh-0.27/sbr/folder_delmsgs.c	Sat Jul 18 14:04:47 1998
+@@ -71,7 +71,7 @@
+ 	    dp = m_name (msgnum);
+ 	    if (rename_msgs) {
+ 		/* rename messages with standard prefix */
+-		strcpy (buf, m_backup (dp));
++		strncpy (buf, m_backup (dp), sizeof(buf));
+ 		if (rename (dp, buf) == -1) {
+ 		    admonish (buf, "unable to rename %s to", dp);
+ 		    retval = -1;
+--- nmh-0.27/sbr/folder_pack.c.security	Mon May 11 21:03:32 1998
++++ nmh-0.27/sbr/folder_pack.c	Sat Jul 18 14:04:47 1998
+@@ -44,8 +44,8 @@
+     for (msgnum = mp->lowmsg, hole = 1; msgnum <= mp->hghmsg; msgnum++) {
+ 	if (does_exist (mp, msgnum)) {
+ 	    if (msgnum != hole) {
+-		strcpy (newmsg, m_name (hole));
+-		strcpy (oldmsg, m_name (msgnum));
++		strncpy (newmsg, m_name (hole), BUFSIZ);
++		strncpy (oldmsg, m_name (msgnum), BUFSIZ);
+ 		if (verbose)
+ 		    printf ("message %s becomes %s\n", oldmsg, newmsg);
+ 
+--- nmh-0.27/sbr/lock_file.c.security	Sun Jan  4 13:19:26 1998
++++ nmh-0.27/sbr/lock_file.c	Sat Jul 18 14:04:47 1998
+@@ -380,7 +380,7 @@
+ lockname (char *file, struct lockinfo *li, int isnewlock)
+ {
+     char *bp, *cp;
+-
++    int blen=BUFSIZ;
+ #if 0
+     struct stat st;
+ #endif
+@@ -390,11 +390,11 @@
+ 	cp = file;
+ 
+ #ifdef LOCKDIR
+-    sprintf (bp, "%s/", lockdir);
++    blen -= snprintf (bp, BUFSIZ,  "%s/", lockdir);
+     bp += strlen (bp);
+ #else
+     if (cp != file) {
+-	sprintf (bp, "%.*s", cp - file, file);
++	blen -= snprintf (bp, BUFSIZ, "%.*s", cp - file, file);
+ 	bp += strlen (bp);
+     }
+ #endif
+@@ -411,7 +411,7 @@
+     sprintf (bp, "LCK%05d.%05d", st.st_dev, st.st_ino);
+ #endif
+ 
+-    sprintf (bp, "%s.lock", cp);
++    snprintf (bp, blen, "%s.lock", cp);
+ 
+     /*
+      * If this is for a new lock, create a name for
+@@ -421,7 +421,7 @@
+ 	if ((cp = strrchr(li->curlock, '/')) == NULL || *++cp == 0)
+ 	    strcpy (li->tmplock, ",LCK.XXXXXX");
+ 	else
+-	    sprintf (li->tmplock, "%.*s,LCK.XXXXXX",
++	    snprintf (li->tmplock, BUFSIZ,  "%.*s,LCK.XXXXXX",
+ 		     cp - li->curlock, li->curlock);
+ 	unlink (mktemp (li->tmplock));
+     }
+--- nmh-0.27/sbr/m_convert.c.security	Sat Jan 10 02:35:45 1998
++++ nmh-0.27/sbr/m_convert.c	Sat Jul 18 14:04:47 1998
+@@ -263,7 +263,11 @@
+ #else
+     while ((*cp >= 'a' && *cp <= 'z') || *cp == '.')
+ #endif /* LOCALE */
++    {
++        if(bp-buf>=sizeof(buf))
++        	break;
+ 	*bp++ = *cp++;
++    }
+     *bp++ = '\0';
+     delimp = cp;
+ 
+--- nmh-0.27/sbr/m_draft.c.security	Sun Feb  8 17:33:01 1998
++++ nmh-0.27/sbr/m_draft.c	Sat Jul 18 14:04:47 1998
+@@ -31,7 +31,7 @@
+     *isdf = 1;
+     
+     chdir (m_maildir (""));
+-    strcpy (buffer, m_maildir (folder));
++    strncpy (buffer, m_maildir (folder), BUFSIZ);
+     if (stat (buffer, &st) == -1) {
+ 	if (errno != ENOENT)
+ 	    adios (buffer, "error on folder");
+--- nmh-0.27/sbr/m_getfld.c.security	Mon May 25 15:54:17 1998
++++ nmh-0.27/sbr/m_getfld.c	Sat Jul 18 14:04:47 1998
+@@ -538,7 +538,7 @@
+ 	    ;
+ #else /* RPATHS */
+ 	cp = unixbuf;
+-	while ((c = getc (iob)) != '\n')
++	while ((c = getc (iob)) != '\n' && cp-unixbuf < BUFSIZ-1)
+ 	    *cp++ = c;
+ 	*cp = 0;
+ #endif /* RPATHS */
+@@ -639,7 +639,7 @@
+ 		break;
+ #else /* RPATHS */
+ 	cp = unixbuf;
+-	while ((c = getc (iob)) != '\n' && c >= 0)
++	while ((c = getc (iob)) != '\n' && c >= 0 && cp-unixbuf < BUFSIZ-1)
+ 	    *cp++ = c;
+ 	*cp = 0;
+ #endif /* RPATHS */
+@@ -688,10 +688,10 @@
+     if (cp) {
+ 	/* return path for UUCP style addressing */
+ 	dp = strchr (++cp, '\n');
+-	sprintf (rp, "%.*s!%.*s\n", dp - cp, cp, bp - ap, ap);
++	snprintf (rp, BUFSIZ, "%.*s!%.*s\n", dp - cp, cp, bp - ap, ap);
+     } else {
+ 	/* return path for standard domain addressing */
+-	sprintf (rp, "%.*s\n", bp - ap, ap);
++	snprintf (rp, BUFSIZ,  "%.*s\n", bp - ap, ap);
+     }
+ 
+     /*
+@@ -702,7 +702,7 @@
+ 	bp++;
+ 
+     /* Now get delivery date from envelope */
+-    sprintf (dd, "%.*s\n", 24, bp);
++    snprintf (dd, BUFSIZ, "%.*s\n", 24, bp);
+ 
+     unixbuf[0] = 0;
+     return 1;
+--- nmh-0.27/sbr/m_maildir.c.security	Sun Dec 14 04:25:16 1997
++++ nmh-0.27/sbr/m_maildir.c	Sat Jul 18 14:04:47 1998
+@@ -47,9 +47,9 @@
+ 	    && strcmp (folder, DOT)
+ 	    && strcmp (folder, DOTDOT)
+ 	    && strncmp (folder, PWD, NPWD)) {
+-	strcpy (maildir, mailfold);		/* preserve... */
++	strncpy (maildir, mailfold, BUFSIZ);		/* preserve... */
+ 	cp = getcpy (m_maildir (folder));
+-	strcpy (mailfold, maildir);
++	strncpy (mailfold, maildir, BUFSIZ);
+     } else {
+ 	cp = path (folder, TFOLDER);
+     }
+@@ -72,14 +72,15 @@
+ 	    && strcmp (folder, DOT)
+ 	    && strcmp (folder, DOTDOT)
+ 	    && strncmp (folder, PWD, NPWD))) {
+-	strcpy (mailfold, folder);
++	strncpy (mailfold, folder, sizeof(mailfold));
++	mailfold[sizeof(mailfold)-1]=0;
+ 	return mailfold;
+     }
+ 
+     cp = mailfold;
+     if ((pp = context_find ("path")) && *pp) {
+ 	if (*pp != '/') {
+-	    sprintf (cp, "%s/", mypath);
++	    snprintf (cp, BUFSIZ,  "%s/", mypath);
+ 	    cp += strlen (cp);
+ 	}
+ 	cp = copy (pp, cp);
+@@ -88,7 +89,7 @@
+ 	cp = copy (path ("./", TFOLDER), cp);
+     if (cp[-1] != '/')
+ 	*cp++ = '/';
+-    strcpy (cp, folder);
++    strncpy (cp, folder, BUFSIZ-(cp-mailfold));
+ 
+     return mailfold;
+ }
+--- nmh-0.27/sbr/m_name.c.security	Tue May 20 01:19:12 1997
++++ nmh-0.27/sbr/m_name.c	Sat Jul 18 14:04:47 1998
+@@ -16,6 +16,6 @@
+     if (num <= 0)
+ 	return "?";
+ 
+-    sprintf (name, "%d", num);
++    snprintf (name, BUFSIZ,  "%d", num);
+     return name;
+ }
+--- nmh-0.27/sbr/m_scratch.c.security	Sun Jan  4 17:15:18 1998
++++ nmh-0.27/sbr/m_scratch.c	Sat Jul 18 14:04:47 1998
+@@ -14,12 +14,12 @@
+     char *cp;
+     static char buffer[BUFSIZ], tmpfil[BUFSIZ];
+ 
+-    sprintf (tmpfil, "%sXXXXXX", template);
++    snprintf (tmpfil, BUFSIZ, "%sXXXXXX", template);
+     mktemp (tmpfil);
+     if ((cp = r1bindex (file, '/')) == file)
+-	strcpy (buffer, tmpfil);
++	strncpy (buffer, tmpfil, BUFSIZ);
+     else
+-	sprintf (buffer, "%.*s%s", cp - file, file, tmpfil);
++	snprintf (buffer, BUFSIZ,  "%.*s%s", cp - file, file, tmpfil);
+     unlink (buffer);
+ 
+     return buffer;
+--- nmh-0.27/sbr/m_tmpfil.c.security	Tue May 20 01:19:12 1997
++++ nmh-0.27/sbr/m_tmpfil.c	Sat Jul 18 14:04:47 1998
+@@ -13,7 +13,7 @@
+ {
+     static char tmpfil[BUFSIZ];
+ 
+-    sprintf(tmpfil, "/tmp/%sXXXXXX", template);
++    snprintf(tmpfil, BUFSIZ, "/tmp/%sXXXXXX", template);
+     unlink(mktemp(tmpfil));
+ 
+     return tmpfil;
+--- nmh-0.27/sbr/makedir.c.security	Sun Jan  4 12:47:57 1998
++++ nmh-0.27/sbr/makedir.c	Sat Jul 18 14:04:47 1998
+@@ -28,7 +28,7 @@
+     fflush(stdout);
+ 
+     if (getuid () == geteuid ()) {
+-	    c = strcpy(path, dir);     
++	    c = strncpy(path, dir, PATH_MAX);     
+ 
+ 	    while ((c = strchr((c + 1), '/')) != NULL) {	
+ 		    *c = (char)0;
+--- nmh-0.27/sbr/path.c.security	Sun Dec 14 04:27:26 1997
++++ nmh-0.27/sbr/path.c	Sat Jul 18 14:04:47 1998
+@@ -44,10 +44,10 @@
+     char buffer[BUFSIZ];
+ 
+     if (flag == TSUBCWF) {
+-	sprintf (buffer, "%s/%s", getfolder (1), name);
++	snprintf (buffer,  BUFSIZ, "%s/%s", getfolder (1), name);
+ 	name = m_mailpath (buffer);
+ 	compath (name);
+-	sprintf (buffer, "%s/", m_maildir (""));
++	snprintf (buffer, BUFSIZ, "%s/", m_maildir (""));
+ 	if (ssequal (buffer, name)) {
+ 	    cp = name;
+ 	    name = getcpy (name + strlen (buffer));
+@@ -81,7 +81,7 @@
+ 	name += NCWD;
+ 
+     if (strcmp (name, DOTDOT) == 0 || strcmp (name, PWD) == 0) {
+-	sprintf (buffer, "%.*s", cp - pwds, pwds);
++	snprintf (buffer, BUFSIZ, "%.*s", cp - pwds, pwds);
+ 	return getcpy (buffer);
+     }
+ 
+@@ -90,7 +90,7 @@
+     else
+ 	cp = ep;
+ 
+-    sprintf (buffer, "%.*s/%s", cp - pwds, pwds, name);
++    snprintf (buffer, BUFSIZ, "%.*s/%s", cp - pwds, pwds, name);
+     return getcpy (buffer);
+ }
+ 
+--- nmh-0.27/sbr/seq_bits.c.security	Wed Nov 26 18:41:45 1997
++++ nmh-0.27/sbr/seq_bits.c	Sat Jul 18 14:04:47 1998
+@@ -14,9 +14,9 @@
+     int i;
+     static char buffer[BUFSIZ];
+ 
+-    strcpy (buffer, MBITS);
++    strncpy (buffer, MBITS, BUFSIZ);
+     for (i = 0; mp->msgattrs[i]; i++)
+-	sprintf (buffer + strlen (buffer), "%c%s",
++	snprintf (buffer + strlen (buffer), BUFSIZ-strlen(buffer), "%c%s",
+ 		FFATTRSLOT + 1 + i, mp->msgattrs[i]);
+ 
+     return buffer;
+--- nmh-0.27/zotnet/tws/dtime.c.security	Sun May 17 12:51:43 1998
++++ nmh-0.27/zotnet/tws/dtime.c	Sat Jul 18 16:42:50 1998
+@@ -252,7 +252,7 @@
+     if (!tw)
+ 	return NULL;
+ 
+-    sprintf (buffer, "%.3s %.3s %02d %02d:%02d:%02d %.4d\n",
++    snprintf (buffer, 25, "%.3s %.3s %02d %02d:%02d:%02d %.4d\n",
+ 	    tw_dotw[tw->tw_wday], tw_moty[tw->tw_mon], tw->tw_mday,
+ 	    tw->tw_hour, tw->tw_min, tw->tw_sec,
+ 	    tw->tw_year < 100 ? tw->tw_year + 1900 : tw->tw_year);
+@@ -326,20 +326,20 @@
+     if ((tw->tw_flags & TW_SZONE) == TW_SZNIL)
+ 	result[0] = '\0';
+     else
+-	sprintf(result, " %s", dtimezone(tw->tw_zone, tw->tw_flags | flags));
++	snprintf(result, 80, " %s", dtimezone(tw->tw_zone, tw->tw_flags | flags));
+ 
+-    sprintf(buffer, "%02d %s %0*d %02d:%02d:%02d%s",
++    snprintf(buffer, 80, "%02d %s %0*d %02d:%02d:%02d%s",
+ 	    tw->tw_mday, tw_moty[tw->tw_mon],
+ 	    tw->tw_year < 100 ? 2 : 4, tw->tw_year,
+ 	    tw->tw_hour, tw->tw_min, tw->tw_sec, result);
+ 
+     if ((tw->tw_flags & TW_SDAY) == TW_SEXP)
+-	sprintf (result, "%s, %s", tw_dotw[tw->tw_wday], buffer);
++	snprintf (result, 80, "%s, %s", tw_dotw[tw->tw_wday], buffer);
+     else
+ 	if ((tw->tw_flags & TW_SDAY) == TW_SNIL)
+ 	    strcpy (result, buffer);
+ 	else
+-	    sprintf (result, "%s (%s)", buffer, tw_dotw[tw->tw_wday]);
++	    snprintf (result, 80, "%s (%s)", buffer, tw_dotw[tw->tw_wday]);
+ 
+     return result;
+ }
+@@ -379,7 +379,7 @@
+     if (flags & TW_DST)
+ 	hours += 1;
+ #endif /* defined(DSTXXX) */
+-    sprintf (buffer, "%s%02d%02d", offset < 0 ? "-" : "+", abs (hours), abs (mins));
++    snprintf (buffer, 10, "%s%02d%02d", offset < 0 ? "-" : "+", abs (hours), abs (mins));
+     return buffer;
+ }
+ 
+--- nmh-0.27/zotnet/mf/mf.c.security	Mon Jan 27 00:38:34 1997
++++ nmh-0.27/zotnet/mf/mf.c	Sat Jul 18 16:46:41 1998
+@@ -425,9 +425,9 @@
+     while (isspace (*ap))
+ 	ap++;
+     if (cp)
+-	sprintf (adr, "%.*s", cp - ap, ap);
++	snprintf (adr, BUFSIZ, "%.*s", cp - ap, ap);
+     else
+-	strcpy (adr, ap);
++	strncpy (adr, ap, BUFSIZ);
+     bp = adr + strlen (adr) - 1;
+     if (*bp == ',' || *bp == ';' || *bp == '\n')
+ 	*bp = 0;
+@@ -484,7 +484,7 @@
+ 	    return OK;		/* why be choosy? */
+ 
+ 	default: 
+-	    sprintf (err, "illegal address construct (%s)", buffer);
++	    snprintf (err, BUFSIZ, "illegal address construct (%s)", buffer);
+ 	    return NOTOK;
+     }
+ 
+@@ -503,13 +503,13 @@
+ 			return NOTOK;
+ 		    if (last_lex == LX_RBRK)
+ 			return OK;
+-		    sprintf (err, "missing right-bracket (%s)", buffer);
++		    snprintf (err, BUFSIZ, "missing right-bracket (%s)", buffer);
+ 		    return NOTOK;
+ 
+ 		case LX_COLN: 
+ 	    get_group: ;
+ 		    if (glevel++ > 0) {
+-			sprintf (err, "nested groups not allowed (%s)", pers);
++			snprintf (err, BUFSIZ, "nested groups not allowed (%s)", pers);
+ 			return NOTOK;
+ 		    }
+ 		    grp = add (": ", pers);
+@@ -538,7 +538,7 @@
+ 		    goto more_phrase;
+ 
+ 		default: 
+-		    sprintf (err, "no mailbox in address, only a phrase (%s%s)",
++		    snprintf (err, BUFSIZ, "no mailbox in address, only a phrase (%s%s)",
+ 			    pers, buffer);
+ 		    return NOTOK;
+ 	    }
+@@ -574,7 +574,7 @@
+ 		    return OK;
+ 
+ 		default: 
+-		    sprintf (err, "junk after local@domain (%s)", buffer);
++		    snprintf (err, BUFSIZ, "junk after local@domain (%s)", buffer);
+ 		    return NOTOK;
+ 	    }
+ 
+@@ -591,7 +591,7 @@
+ 	    return OK;
+ 
+ 	default: 
+-	    sprintf (err, "missing mailbox (%s)", buffer);
++	    snprintf (err, BUFSIZ, "missing mailbox (%s)", buffer);
+ 	    return NOTOK;
+     }
+ }
+@@ -639,7 +639,7 @@
+ 	    return OK;
+ 
+ 	default: 
+-	    sprintf (err, "no at-sign after local-part (%s)", buffer);
++	    snprintf (err, BUFSIZ, "no at-sign after local-part (%s)", buffer);
+ 	    return NOTOK;
+     }
+ }
+@@ -658,7 +658,7 @@
+ 		break;
+ 
+ 	    default: 
+-		sprintf (err, "no mailbox in local-part (%s)", buffer);
++		snprintf (err, BUFSIZ, "no mailbox in local-part (%s)", buffer);
+ 		return NOTOK;
+ 	}
+ 
+@@ -685,7 +685,7 @@
+ 		break;
+ 
+ 	    default: 
+-		sprintf (err, "no sub-domain in domain-part of address (%s)", buffer);
++		snprintf (err, BUFSIZ, "no sub-domain in domain-part of address (%s)", buffer);
+ 		return NOTOK;
+ 	}
+ 
+@@ -720,7 +720,7 @@
+ 		break;
+ 
+ 	    default: 
+-		sprintf (err, "no sub-domain in domain-part of address (%s)", buffer);
++		snprintf (err, BUFSIZ, "no sub-domain in domain-part of address (%s)", buffer);
+ 		return NOTOK;
+ 	}
+ 	switch (my_lex (buffer)) {
+@@ -736,7 +736,7 @@
+ 			    break;
+ 
+ 			default: 
+-			    sprintf (err, "no at-sign found for next domain in route (%s)",
++			    snprintf (err, BUFSIZ, "no at-sign found for next domain in route (%s)",
+ 			             buffer);
+ 		    }
+ 		    break;
+@@ -753,7 +753,7 @@
+ 		return OK;
+ 
+ 	    default: 
+-		sprintf (err, "no colon found to terminate route (%s)", buffer);
++		snprintf (err, BUFSIZ, "no colon found to terminate route (%s)", buffer);
+ 		return NOTOK;
+ 	}
+     }
+@@ -894,7 +894,7 @@
+     for (cp = p; *cp; cp++)
+ 	for (i = 0; special[i].lx_chr; i++)
+ 	    if (*cp == special[i].lx_chr) {
+-		sprintf (buffer, "\"%s\"", p);
++		snprintf (buffer, BUFSIZ, "\"%s\"", p);
+ 		return buffer;
+ 	    }
+ 
+--- nmh-0.27/zotnet/bboards/getbbent.c.security	Sun Feb  2 05:04:22 1997
++++ nmh-0.27/zotnet/bboards/getbbent.c	Sat Jul 18 14:04:49 1998
+@@ -100,7 +100,7 @@
+     if (BBuid == -1)
+ 	return setbbinfo (BBOARDS, file, f);
+ 
+-    strcpy (BBData, file);
++    strncpy (BBData, file, sizeof(BBData));
+ 
+     BBflags = SB_NULL;
+     endbbent ();
+@@ -153,10 +153,10 @@
+ static int
+ setpwaux (struct passwd *pw, char *file)
+ {
+-    strcpy (BBName, pw->pw_name);
++    strncpy (BBName, pw->pw_name, sizeof(BBName));
+     BBuid = pw->pw_uid;
+-    strcpy (BBDir, pw->pw_dir);
+-    sprintf (BBData, "%s/%s",
++    strncpy (BBDir, pw->pw_dir, sizeof(BBDir));
++    snprintf (BBData,sizeof(BBData), "%s/%s",
+ 	    *file != '/' ? BBDir : "",
+ 	    *file != '/' ? file : file + 1);
+ 
+@@ -395,12 +395,12 @@
+ 
+     if (*bb->bb_request == '-')
+ 	if (p == NULL && r && *r == '@')
+-	    sprintf (BBRequest, "%s%s%s", bb->bb_name, bb->bb_request, r);
++	    snprintf (BBRequest, sizeof(BBRequest), "%s%s%s", bb->bb_name, bb->bb_request, r);
+ 	else
+-	    sprintf (BBRequest, "%s%s", bb->bb_name, bb->bb_request);
++	    snprintf (BBRequest, sizeof(BBRequest), "%s%s", bb->bb_name, bb->bb_request);
+     else
+ 	if (p == NULL && r && *r == '@' && *bb->bb_request)
+-	    sprintf (BBRequest, "%s%s", bb->bb_request, r);
++	    snprintf (BBRequest, sizeof(BBRequest), "%s%s", bb->bb_request, r);
+ 
+     if (BBRequest[0])
+ 	bb->bb_request = BBRequest;
+@@ -410,7 +410,7 @@
+ 		: bb->bb_leader[0];
+ 
+     if (*bb->bb_addr == '@') {
+-	sprintf (BBAddr, "%s%s", bb->bb_name, bb->bb_addr);
++	snprintf (BBAddr, sizeof(BBAddr), "%s%s", bb->bb_name, bb->bb_addr);
+ 	bb->bb_addr = BBAddr;
+     }
+     else
+@@ -420,22 +420,22 @@
+     if (*bb->bb_file == 0)
+ 	return;
+     if (*bb->bb_file != '/') {
+-	sprintf (BBFile, "%s/%s", BBDir, bb->bb_file);
++	snprintf (BBFile, sizeof(BBFile), "%s/%s", BBDir, bb->bb_file);
+ 	bb->bb_file = BBFile;
+     }
+ 
+     if ((cp = strrchr(bb->bb_file, '/')) == NULL || *++cp == 0)
+ 	strcpy (prf, ""), cp = bb->bb_file;
+     else
+-	sprintf (prf, "%.*s", cp - bb->bb_file, bb->bb_file);
++	snprintf (prf, sizeof(prf),"%.*s", cp - bb->bb_file, bb->bb_file);
+     if ((dp = strchr(cp, '.')) == NULL)
+ 	dp = cp + strlen (cp);
+ 
+-    sprintf (BBArchive, "%s%s/%s", prf, ARCHIVE, cp);
++    snprintf (BBArchive, sizeof(BBArchive), "%s%s/%s", prf, ARCHIVE, cp);
+     bb->bb_archive = BBArchive;
+-    sprintf (BBInfo, "%s.%.*s%s", prf, dp - cp, cp, CNTFILE);
++    snprintf (BBInfo, sizeof(BBInfo), "%s.%.*s%s", prf, dp - cp, cp, CNTFILE);
+     bb->bb_info = BBInfo;
+-    sprintf (BBMap, "%s.%.*s%s", prf, dp - cp, cp, MAPFILE);
++    snprintf (BBMap, sizeof(BBMap), "%s.%.*s%s", prf, dp - cp, cp, MAPFILE);
+     bb->bb_map = BBMap;
+ 
+     if ((info = fopen (bb->bb_info, "r")) == NULL)
+@@ -460,7 +460,7 @@
+     register char *p, **q, **r;
+     static uid_t uid = 0;
+     static gid_t gid = 0;
+-    static char username[10] = "";
++    static char username[16] = "";
+     register struct passwd *pw;
+     register struct group  *gr;
+ 
+@@ -473,7 +473,7 @@
+ 	if ((pw = getpwuid (uid = getuid ())) == NULL)
+ 	    return 0;
+ 	gid = getgid ();
+-	strcpy (username, pw->pw_name);
++	strncpy (username, pw->pw_name, sizeof(username));
+     }
+ 
+     if (uid == BBuid)
+@@ -626,15 +626,15 @@
+ 		    if ((cp = strrchr(bb->bb_file, '/')) == NULL || *++cp == 0)
+ 			strcpy (prf, ""), cp = bb->bb_file;
+ 		    else
+-			sprintf (prf, "%.*s", cp - bb->bb_file, bb->bb_file);
++			snprintf (prf, BUFSIZ, "%.*s", cp - bb->bb_file, bb->bb_file);
+ 		    if ((dp = strchr(cp, '.')) == NULL)
+ 			dp = cp + strlen (cp);
+-		    sprintf (file, "%s.%.*s%s", prf, dp - cp, cp, DSTFILE);
++		    snprintf (file, BUFSIZ,  "%s.%.*s%s", prf, dp - cp, cp, DSTFILE);
+ 		    hp = file;
+ 		    break;
+ 
+ 		default: 
+-		    sprintf (file, "%s/%s", BBDir, item);
++		    snprintf (file, BUFSIZ, "%s/%s", BBDir, item);
+ 		    hp = file;
+ 		    break;
+ 	    }
+@@ -656,12 +656,12 @@
+ 	default: 
+ 	    if ((hp = strrchr(item, '@'))) {
+ 		*hp++ = 0;
+-		strcpy (mbox, item);
+-		strcpy (host, hp);
++		strncpy (mbox, item, sizeof(mbox));
++		strncpy (host, hp, sizeof(host));
+ 		*--hp = '@';
+ 	    }
+ 	    else {
+-		sprintf (mbox, "%s%s", DISTADR, bb->bb_name);
++		snprintf (mbox, sizeof(mbox), "%s%s", DISTADR, bb->bb_name);
+ 		strcpy (host, item);
+ 	    }
+ 	    if ((result = (*action) (mbox, host)))
+--- nmh-0.27/mts/smtp/hosts.c.security	Thu Jan 22 18:21:02 1998
++++ nmh-0.27/mts/smtp/hosts.c	Sat Jul 18 14:04:47 1998
+@@ -39,7 +39,7 @@
+     char **r;
+     struct host *h;
+ 
+-    for (p = name, q = site; *p; p++, q++)
++    for (p = name, q = site; *p; p++, q++ && q-site <BUFSIZ)
+ 	*q = isupper (*p) ? tolower (*p) : *p;
+     *q = 0;
+     q = site;
+@@ -64,7 +64,7 @@
+ 		    if (!strcasecmp (*r, q))
+ 			return h->h_name;
+ 
+-    strcpy (buffer, site);
++    strncpy (buffer, site, BUFSIZ);
+     return buffer;
+ }
+ 
+--- nmh-0.27/mts/smtp/smtp.c.security	Wed Nov 26 19:39:35 1997
++++ nmh-0.27/mts/smtp/smtp.c	Sat Jul 18 14:04:47 1998
+@@ -76,7 +76,7 @@
+ #endif
+ 
+ 
+-#define	MAXEHLO	20
++#define	MAXEHLO	30
+ 
+ static int doingEHLO;
+ char *EHLOkeys[MAXEHLO + 1];
+@@ -247,7 +247,7 @@
+ 
+ 		if ((dp = strrchr(*ap, '/')) && *++dp == NULL)
+ 		    *--dp = NULL;
+-		sprintf (sm_tmpfil, "%s/smtpXXXXXX", *ap);
++		snprintf (sm_tmpfil, sizeof(sm_tmpfil), "%s/smtpXXXXXX", *ap);
+ 		mktemp (sm_tmpfil);
+ 
+ 		if ((sd = creat (sm_tmpfil, 0600)) != NOTOK) {
+@@ -486,16 +486,17 @@
+     char *dp, *bp, *cp, s;
+     char buffer[BUFSIZ], sender[BUFSIZ];
+     FILE *fp, *gp;
++    int len=BUFSIZ;
+ 
+     gp = NULL;
+     k = strlen (file) - sizeof(".bulk");
+     if ((fp = fopen (file, "r")) == NULL) {
+-	sprintf (bp = sm_reply.text, "unable to read %s: ", file);
++	len-=snprintf (bp = sm_reply.text, BUFSIZ,  "unable to read %s: ", file);
+ 	bp += strlen (bp);
+ 	if ((s = strerror (errno)))
+-	    strcpy (bp, s);
++	    len-=snprinf(bp, len, "%s", s);
+ 	else
+-	    sprintf (bp, "Error %d", errno);
++	    len-=snprintf (bp, len, "Error %d", errno);
+ 	sm_reply.length = strlen (sm_reply.text);
+ 	sm_reply.code = NOTOK;
+ 	return RP_BHST;
+@@ -520,10 +521,10 @@
+ 	    fflush (stdout);
+ 	}
+ losing0: ;
+-	sprintf (buffer, "%s.bad", file);
++	snprintf (buffer, BUFSIZ, "%s.bad", file);
+ 	rename (file, buffer);
+ 	if (gp) {
+-	    sprintf (buffer, "%*.*sA.bulk", k, k, file);
++	    snprintf (buffer, BUFSIZ, "%*.*sA.bulk", k, k, file);
+ 	    unlink (buffer);
+ 	    fclose (gp);
+ 	}
+@@ -557,13 +558,15 @@
+ 
+     for (dp = cp, i = cc - 1; i > 0; dp += cc, i -= cc)
+ 	if ((cc = write (fileno (sm_wfp), dp, i)) == NOTOK) {
++	    len=BUFSIZ;
+ losing3: ;
+ 	    strcpy (bp = sm_reply.text, "error writing to server: ");
+ 	    bp += strlen (bp);
++	    len -= strlen(bp);
+ 	    if ((s = strerror (errno)))
+-		strcpy (bp, s);
++		len-=snprintf(bp, len, "%s", s);
+ 	    else
+-		sprintf (bp, "unknown error %d", errno);
++		len-=snprintf (bp, len, "unknown error %d", errno);
+ 	    sm_reply.length = strlen (sm_reply.text);
+ 	    goto losing2;
+ 	}
+@@ -627,7 +630,7 @@
+ 		    break;
+ 		if (gp == NULL) {
+ 		    int	    l;
+-		    sprintf (buffer, "%*.*sA.bulk", k, k, file);
++		    snprintf (buffer, BUFSIZ, "%*.*sA.bulk", k, k, file);
+ 		    if ((gp = fopen (buffer, "w+")) == NULL)
+ 			goto bad_data;
+ 		    fprintf (gp, "MAIL FROM:<>\r\nRCPT TO:%sDATA\r\n", sender);
+@@ -664,7 +667,7 @@
+ 		smtalk (SM_RSET, "RSET");
+ 		free (cp);
+ 		if (gp) {
+-		    sprintf (buffer, "%*.*sA.bulk", k, k, file);
++		    snprintf (buffer, BUFSIZ, "%*.*sA.bulk", k, k, file);
+ 		    unlink (buffer);
+ 		    fclose (gp);
+ 		}
+@@ -708,12 +711,13 @@
+ 	for (dp = cp, i = cc; i > 0; dp += j, i -= j)
+ 	    if ((j = fread (cp, sizeof(*cp), i, fp)) == OK) {
+ 		if (ferror (fp)) {
+-		    sprintf (bp = sm_reply.text, "error reading %s: ", file);
++		    len=BUFSIZ;
++		    len-=snprintf (bp = sm_reply.text, len, "error reading %s: ", file);
+ 		    bp += strlen (bp);
+ 		    if ((s = strerror (errno)))
+-			strcpy (bp, s);
++			len-=snprintf(bp, len, "%s", s);
+ 		    else
+-			sprintf (bp, "unknown error %d", errno);
++			len-=snprintf (bp, len, "unknown error %d", errno);
+ 		    sm_reply.length = strlen (sm_reply.text);
+ 		    goto losing2;
+ 		}
+@@ -754,7 +758,7 @@
+ 	default: 
+ 	    result = RP_NO;
+ 	    if (gp) {
+-		sprintf (buffer, "%*.*sA.bulk", k, k, file);
++		snprintf (buffer, BUFSIZ, "%*.*sA.bulk", k, k, file);
+ 		unlink (buffer);
+ 		fclose (gp);
+ 		gp = NULL;
+@@ -775,7 +779,7 @@
+ 		fseek (gp, 0L, SEEK_SET);
+ 	    }
+     	    else {
+-		sprintf (buffer, "%*.*sA.bulk", k, k, file);
++		snprintf (buffer, BUFSIZ, "%*.*sA.bulk", k, k, file);
+ 		if ((gp = fopen (buffer, "w")) == NULL)
+ 		    break;
+ 	    }
+@@ -816,7 +820,7 @@
+     va_list ap;
+ 
+     va_start(ap, fmt);
+-    vsprintf (sm_reply.text, fmt, ap);
++    vsnprintf (sm_reply.text, BUFSIZ, fmt, ap);
+     va_end(ap);
+ 
+     sm_reply.length = strlen (sm_reply.text);
+@@ -834,7 +838,7 @@
+     char buffer[BUFSIZ];
+ 
+     va_start(ap, fmt);
+-    vsprintf (buffer, fmt, ap);
++    vsnprintf (buffer, BUFSIZ, fmt, ap);
+     va_end(ap);
+ 
+     if (sm_debug) {
+@@ -854,18 +858,19 @@
+ 	        fflush (sm_wfp);
+ 	        if (ferror (sm_wfp))
+ 		    return sm_werror ();
+-		sprintf (file, "%s%c.bulk", sm_tmpfil,
++		snprintf (file, BUFSIZ, "%s%c.bulk", sm_tmpfil,
+ 				(char) (sm_ispool + 'a' - 1));
+ 		if (rename (sm_tmpfil, file) == NOTOK) {
+ 		    char   *bp;
+-		    sprintf (bp = sm_reply.text,
++		    int len=BUFSIZ;
++		    len-=snprintf (bp = sm_reply.text, len,
+ 				    "error renaming %s to %s: ",
+ 				    sm_tmpfil, file);
+ 		    bp += strlen (bp);
+ 		    if ((s = strerror (errno)))
+-			strcpy (bp, s);
++			len-=snprintf(bp, len, "%s", s);
+ 		    else
+-			sprintf (bp, "unknown error %d", errno);
++			len-=snprintf (bp, len, "unknown error %d", errno);
+ 		    sm_reply.length = strlen (sm_reply.text);
+ 		    sm_reply.code = NOTOK;
+ 		    return RP_BHST;
+@@ -1012,6 +1017,7 @@
+     int i, code, cont, bc, rc, more;
+     char *bp, *rp;
+     char **ehlo, buffer[BUFSIZ];
++    int len = BUFSIZ;
+ 
+     if (doingEHLO) {
+ 	static int at_least_once = 0;
+@@ -1091,10 +1097,14 @@
+ 	}
+ 
+ 	if ((i = min (bc, rc)) > 0) {
+-	    strncpy (rp, bp, i);
++	    if(len>i)
++	    {
++		    strncpy (rp, bp, i);
++		    len-=i;
++	    }
+ 	    rp += i, rc -= i;
+ 	    if (more && rc > strlen (sm_moreply) + 1) {
+-		strcpy (sm_reply.text + rc, sm_moreply);
++		snprintf(sm_reply.text + rc, BUFSIZ-rc, "%s", sm_moreply);
+ 		rc += strlen (sm_moreply);
+ 	    }
+ 	}
+@@ -1193,7 +1203,7 @@
+ 	case RP_BHST: 
+ 	default: 
+ 	    text = "BHST";
+-	    sprintf (buffer, "[%s] %s", text, sm_reply.text);
++	    snprintf (buffer, BUFSIZ,  "[%s] %s", text, sm_reply.text);
+ 	    return buffer;
+ 
+ 	case RP_PARM: 
+@@ -1213,7 +1223,7 @@
+ 	    break;
+     }
+ 
+-    sprintf (buffer, "[%s] %3d %s", text, sm_reply.code, sm_reply.text);
++    snprintf (buffer, BUFSIZ, "[%s] %3d %s", text, sm_reply.code, sm_reply.text);
+     return buffer;
+ }
+ 
+--- nmh-0.27/mts/sendmail/hosts.c.security	Thu Jan 22 18:20:36 1998
++++ nmh-0.27/mts/sendmail/hosts.c	Sat Jul 18 14:04:47 1998
+@@ -39,7 +39,7 @@
+     char **r;
+     struct host *h;
+ 
+-    for (p = name, q = site; *p; p++, q++)
++    for (p = name, q = site; *p; p++, q++ && q-site < BUFSIZ)
+ 	*q = isupper (*p) ? tolower (*p) : *p;
+     *q = 0;
+     q = site;
+--- nmh-0.27/mts/sendmail/sendmail.c.security	Wed Nov 26 19:38:55 1997
++++ nmh-0.27/mts/sendmail/sendmail.c	Sat Jul 18 14:04:47 1998
+@@ -80,7 +80,7 @@
+ 
+ static int doingEHLO;
+ 
+-#define	MAXEHLO	10
++#define	MAXEHLO	20		/* 10 isnt enough nowdays */
+ char *EHLOkeys[MAXEHLO + 1];
+ 
+ /*
+@@ -428,7 +428,7 @@
+     va_list ap;
+ 
+     va_start(ap, fmt);
+-    vsprintf (sm_reply.text, fmt, ap);
++    vsnprintf (sm_reply.text, BUFSIZ, fmt, ap);
+     va_end(ap);
+ 
+     sm_reply.length = strlen (sm_reply.text);
+@@ -444,9 +444,10 @@
+     int result;
+     char buffer[BUFSIZ];
+     va_list ap;
++    int len=BUFSIZ;
+ 
+     va_start(ap, fmt);
+-    vsprintf (buffer, fmt, ap);
++    vsnprintf (buffer, BUFSIZ, fmt, ap);
+     va_end(ap);
+ 
+     if (sm_debug) {
+@@ -466,18 +467,18 @@
+ 	        fflush (sm_wfp);
+ 	        if (ferror (sm_wfp))
+ 		    return sm_werror ();
+-		sprintf (file, "%s%c.bulk", sm_tmpfil,
++		snprintf (file, BUFSIZ, "%s%c.bulk", sm_tmpfil,
+ 				(char) (sm_ispool + 'a' - 1));
+ 		if (rename (sm_tmpfil, file) == NOTOK) {
+ 		    char   *bp;
+-		    sprintf (bp = sm_reply.text,
++		    len-=snprintf (bp = sm_reply.text, BUFSIZ, 
+ 				    "error renaming %s to %s: ",
+ 				    sm_tmpfil, file);
+ 		    bp += strlen (bp);
+ 		    if ((s = strerror (errno)))
+-			strcpy (bp, s);
+-		    else
+-			sprintf (bp, "unknown error %d", errno);
++			len-=snprintf(bp, len, "%s",s);
++		    else 
++			len-=snprintf (bp, len, "unknown error %d", errno);
+ 		    sm_reply.length = strlen (sm_reply.text);
+ 		    sm_reply.code = NOTOK;
+ 		    return RP_BHST;
+@@ -694,8 +695,11 @@
+ 	    strncpy (rp, bp, i);
+ 	    rp += i, rc -= i;
+ 	    if (more && rc > strlen (sm_moreply) + 1) {
+-		strcpy (sm_reply.text + rc, sm_moreply);
+-		rc += strlen (sm_moreply);
++		if(rc<BUFSIZ)
++		{
++			strncpy (sm_reply.text + rc, sm_moreply, BUFSIZ-rc);
++			rc += strlen (sm_moreply);
++		}
+ 	    }
+ 	}
+ 	if (more)
+@@ -795,7 +799,7 @@
+ 	case RP_BHST: 
+ 	default: 
+ 	    text = "BHST";
+-	    sprintf (buffer, "[%s] %s", text, sm_reply.text);
++	    snprintf (buffer, BUFSIZ,  "[%s] %s", text, sm_reply.text);
+ 	    return buffer;
+ 
+ 	case RP_PARM: 
+@@ -815,7 +819,7 @@
+ 	    break;
+     }
+ 
+-    sprintf (buffer, "[%s] %3d %s", text, sm_reply.code, sm_reply.text);
++    snprintf (buffer, BUFSIZ, "[%s] %3d %s", text, sm_reply.code, sm_reply.text);
+     return buffer;
+ }
+ 
+--- nmh-0.27/uip/ali.c.security	Fri Feb 27 00:41:41 1998
++++ nmh-0.27/uip/ali.c	Sat Jul 18 16:24:00 1998
+@@ -54,7 +54,7 @@
+ {
+     int i, vecp = 0, inverted = 0, list = 0;
+     int noalias = 0, normalize = AD_NHST;
+-    char *cp, **ap, **argp, buf[100];
++    char *cp, **ap, **argp, buf[BUFSIZ];
+     char *vec[NVEC], *arguments[MAXARGS];
+     struct aka *ak;
+ 
+@@ -63,13 +63,13 @@
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+     mts_init (invo_name);
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -82,7 +82,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] aliases ...", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] aliases ...", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -126,7 +126,7 @@
+ 
+     if (!noalias) {
+ 	/* allow Aliasfile: profile entry */
+-	if ((cp = context_find ("Aliasfile"))) {
++	if ((cp = context_find ("Aliasfile")) != NULL) {
+ 	    char *dp = NULL;
+ 
+ 	    for (ap = brkstring(dp = getcpy(cp), " ", "\n"); ap && *ap; ap++)
+--- nmh-0.27/uip/aliasbr.c.security	Wed Feb 25 17:22:56 1998
++++ nmh-0.27/uip/aliasbr.c	Sat Jul 18 14:04:47 1998
+@@ -250,23 +250,23 @@
+ 
+     switch (i) {
+ 	case AK_NOFILE: 
+-	    sprintf (buffer, "unable to read '%s'", akerrst);
++	    snprintf (buffer, BUFSIZ, "unable to read '%s'", akerrst);
+ 	    break;
+ 
+ 	case AK_ERROR: 
+-	    sprintf (buffer, "error in line '%s'", akerrst);
++	    snprintf (buffer, BUFSIZ, "error in line '%s'", akerrst);
+ 	    break;
+ 
+ 	case AK_LIMIT: 
+-	    sprintf (buffer, "out of memory while on '%s'", akerrst);
++	    snprintf (buffer, BUFSIZ, "out of memory while on '%s'", akerrst);
+ 	    break;
+ 
+ 	case AK_NOGROUP: 
+-	    sprintf (buffer, "no such group as '%s'", akerrst);
++	    snprintf (buffer, BUFSIZ, "no such group as '%s'", akerrst);
+ 	    break;
+ 
+ 	default: 
+-	    sprintf (buffer, "unknown error (%d)", i);
++	    snprintf (buffer, BUFSIZ, "unknown error (%d)", i);
+ 	    break;
+     }
+ 
+@@ -582,7 +582,7 @@
+      * The only place where there might be problems.
+      * This assumes that ALL usernames are kept in lowercase.
+      */
+-    for (c = name, c1 = lname; *c; c++, c1++) {
++    for (c = name, c1 = lname; *c && c1-lname < 32; c++, c1++) {
+         if (isalpha(*c) && isupper(*c))
+ 	    *c1 = tolower (*c);
+ 	else
+--- nmh-0.27/uip/anno.c.security	Wed Jan 14 21:05:47 1998
++++ nmh-0.27/uip/anno.c	Sat Jul 18 16:24:20 1998
+@@ -39,7 +39,7 @@
+     int inplace = 1, datesw = 1;
+     int msgp = 0, msgnum;
+     char *cp, *maildir, *comp = NULL;
+-    char *text = NULL, *folder = NULL, buf[100], **ap;
++    char *text = NULL, *folder = NULL, buf[BUFSIZ], **ap;
+     char **argp, *arguments[MAXARGS], *msgs[MAXARGS];
+     struct msgs *mp;
+ 
+@@ -47,13 +47,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -66,7 +66,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msgs] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -116,7 +116,7 @@
+ 	datesw = 0;
+ #endif	/* UCI */
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (!msgp)
+ 	msgs[msgp++] = "cur";
+--- nmh-0.27/uip/annosbr.c.security	Sat Aug  2 00:40:20 1997
++++ nmh-0.27/uip/annosbr.c	Sat Jul 18 14:04:47 1998
+@@ -52,7 +52,7 @@
+ 
+     mode = fstat (fd, &st) != NOTOK ? (st.st_mode & 0777) : m_gmprot ();
+ 
+-    strcpy (tmpfil, m_scratch (file, "annotate"));
++    strncpy (tmpfil, m_scratch (file, "annotate"), BUFSIZ);
+ 
+     if ((tmp = fopen (tmpfil, "w")) == NULL) {
+ 	admonish (tmpfil, "unable to create");
+--- nmh-0.27/uip/ap.c.security	Wed Jan 14 21:06:00 1998
++++ nmh-0.27/uip/ap.c	Sat Jul 18 16:24:35 1998
+@@ -55,7 +55,7 @@
+     int addrp = 0, normalize = AD_HOST;
+     int width = 0, status = 0;
+     char *cp, *form = NULL, *format = NULL, *nfs;
+-    char buf[80], **ap, **argp;
++    char buf[BUFSIZ], **ap, **argp;
+     char *arguments[MAXARGS], *addrs[NADDRS];
+ 
+ #ifdef LOCALE
+@@ -63,13 +63,13 @@
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+     mts_init (invo_name);
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -83,7 +83,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] addrs ...", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] addrs ...", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+--- nmh-0.27/uip/burst.c.security	Wed May 20 11:16:21 1998
++++ nmh-0.27/uip/burst.c	Sat Jul 18 16:24:53 1998
+@@ -47,7 +47,7 @@
+ {
+     int inplace = 0, quietsw = 0, verbosw = 0;
+     int msgp = 0, hi, msgnum, numburst;
+-    char *cp, *maildir, *folder = NULL, buf[100], **ap;
++    char *cp, *maildir, *folder = NULL, buf[BUFSIZ], **ap;
+     char **argp, *arguments[MAXARGS], *msgs[MAXARGS];
+     struct smsg *smsgs;
+     struct msgs *mp;
+@@ -56,13 +56,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -75,7 +75,7 @@
+ 		adios (NULL, "-%s unknown\n", cp);
+ 
+ 	    case HELPSW: 
+-		sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		snprintf (buf, BUFSIZ, "%s [+folder] [msgs] [switches]", invo_name);
+ 		print_help (buf, switches, 1);
+ 		done (1);
+ 	    case VERSIONSW:
+@@ -114,7 +114,7 @@
+ 	}
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (!msgp)
+ 	msgs[msgp++] = "cur";
+@@ -293,8 +293,8 @@
+      */
+     if (inplace) {
+ 	for (i = mp->hghmsg; j > msgnum; i--, j--) {
+-	    strcpy (f1, m_name (i));
+-	    strcpy (f2, m_name (j));
++	    strncpy (f1, m_name (i), BUFSIZ);
++	    strncpy (f2, m_name (j), BUFSIZ);
+ 	    if (does_exist (mp, j)) {
+ 		if (verbosw)
+ 		    printf ("message %d becomes message %d\n", j, i);
+@@ -313,8 +313,8 @@
+     /* new hghmsg is hghmsg + numburst */
+     i = inplace ? msgnum + numburst : mp->hghmsg;
+     for (j = numburst; j >= (inplace ? 0 : 1); i--, j--) {
+-	strcpy (f1, m_name (i));
+-	strcpy (f2, m_scratch ("", invo_name));
++	strncpy (f1, m_name (i), BUFSIZ);
++	strncpy (f2, m_scratch ("", invo_name), BUFSIZ);
+ 	if (verbosw && i != msgnum)
+ 	    printf ("message %d of digest %d becomes message %d\n", j, msgnum, i);
+ 
+@@ -327,7 +327,7 @@
+ 	fclose (out);
+ 
+ 	if (i == msgnum) {
+-	    strcpy (f3, m_backup (f1));
++	    strncpy (f3, m_backup (f1), BUFSIZ);
+ 	    if (rename (f1, f3) == NOTOK)
+ 		admonish (f3, "unable to rename %s to", f1);
+ 	}
+--- nmh-0.27/uip/comp.c.security	Wed Jul  1 00:14:37 1998
++++ nmh-0.27/uip/comp.c	Sat Jul 18 16:25:17 1998
+@@ -80,13 +80,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, BUFSIZ);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, BUFSIZ);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -99,7 +99,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msg] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msg] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -179,7 +179,7 @@
+ 
+     cwd = getcpy (pwd ());
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+ 
+     /* Check if we are using a draft folder */
+@@ -235,7 +235,7 @@
+     }
+ 
+ try_it_again:
+-    strcpy (drft, m_draft (dfolder, file, use, &isdf));
++    strncpy (drft, m_draft (dfolder, file, use, &isdf), BUFSIZ);
+ 
+     /*
+      * Check if we have an existing draft
+--- nmh-0.27/uip/conflict.c.security	Wed Jan 14 21:07:48 1998
++++ nmh-0.27/uip/conflict.c	Sat Jul 18 14:04:48 1998
+@@ -61,7 +61,7 @@
+ {
+     int	akp = 0, dp = 0;
+     char *cp, **argp = argv + 1;
+-    char buf[80], *akv[50];
++    char buf[BUFSIZ], *akv[50];
+ 
+ #ifdef LOCALE
+     setlocale(LC_ALL, "");
+@@ -83,7 +83,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] [aliasfiles ...]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] [aliasfiles ...]", invo_name);
+ 		    print_help (buf, switches, 0);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -539,3 +539,4 @@
+ 	fprintf (out, "all group leaders accounted for\n");
+ }
+ #endif	/* UCI */
++
+--- nmh-0.27/uip/dist.c.security	Wed Jul  1 00:15:07 1998
++++ nmh-0.27/uip/dist.c	Sat Jul 18 16:25:35 1998
+@@ -73,7 +73,7 @@
+     int nwhat = 0, i, in, isdf = 0, out;
+     char *cp, *cwd, *maildir, *msgnam, *dfolder = NULL;
+     char *dmsg = NULL, *ed = NULL, *file = NULL, *folder = NULL;
+-    char *form = NULL, *msg = NULL, buf[100], drft[BUFSIZ];
++    char *form = NULL, *msg = NULL, buf[BUFSIZ], drft[BUFSIZ];
+     char **ap, **argp, *arguments[MAXARGS];
+     struct msgs *mp = NULL;
+     struct stat st;
+@@ -82,13 +82,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -101,7 +101,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msg] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msg] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -187,7 +187,7 @@
+ 
+     cwd = getcpy (pwd ());
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (file && (msg || folder))
+ 	adios (NULL, "can't mix files and folders/msgs");
+@@ -202,7 +202,7 @@
+     }
+ 
+ try_it_again:
+-    strcpy (drft, m_draft (dfolder, dmsg, NOUSE, &isdf));
++    strncpy (drft, m_draft (dfolder, dmsg, NOUSE, &isdf), BUFSIZ);
+ 
+     /* Check if draft already exists */
+     if (stat (drft, &st) != NOTOK) {
+--- nmh-0.27/uip/distsbr.c.security	Wed Dec 17 02:09:47 1997
++++ nmh-0.27/uip/distsbr.c	Sat Jul 18 14:04:48 1998
+@@ -49,9 +49,9 @@
+ 	    case FLDPLUS: 
+ 	    case FLDEOF: 
+ 		if (uprf (name, "distribute-"))
+-		    sprintf (name, "%s%s", "Resent", &name[10]);
++		    snprintf (name, NAMESZ, "%s%s", "Resent", &name[10]);
+ 		if (uprf (name, "distribution-"))
+-		    sprintf (name, "%s%s", "Resent", &name[12]);
++		    snprintf (name, NAMESZ, "%s%s", "Resent", &name[12]);
+ 		if (!uprf (name, "resent")) {
+ 		    advise (NULL, BADHDR, "draft", name);
+ 		    goto leave_bad;
+@@ -135,7 +135,7 @@
+     if ((ifp = fopen (msgnam, "r")) == NULL)
+ 	adios (msgnam, "unable to open message");
+ 
+-    strcpy (tmpfil, m_tmpfil ("dist"));
++    strncpy (tmpfil, m_tmpfil ("dist"), BUFSIZ);
+     if ((hdrfd = open (tmpfil, O_RDWR | O_CREAT | O_TRUNC, 0600)) == NOTOK)
+ 	adios (tmpfil, "unable to re-open temporary file");
+     if ((out = dup (hdrfd)) == NOTOK
+@@ -165,7 +165,7 @@
+ 	    case BODYEOF: 
+ 		fclose (ofp);
+ 
+-		strcpy (tmpfil, m_tmpfil ("dist"));
++		strncpy (tmpfil, m_tmpfil ("dist"), BUFSIZ);
+ 		if ((txtfd = open (tmpfil, O_RDWR | O_CREAT | O_TRUNC, 0600)) == NOTOK)
+ 		    adios (tmpfil, "unable to open temporary file");
+ 		if ((out = dup (txtfd)) == NOTOK
+--- nmh-0.27/uip/dp.c.security	Wed Jan 14 21:08:15 1998
++++ nmh-0.27/uip/dp.c	Sat Jul 18 16:25:47 1998
+@@ -50,20 +50,20 @@
+ {
+     int datep = 0, width = 0, status = 0;
+     char *cp, *form = NULL, *format = NULL, *nfs;
+-    char buf[80], **ap, **argp, *arguments[MAXARGS];
++    char buf[BUFSIZ], **ap, **argp, *arguments[MAXARGS];
+     char *dates[NDATES];
+ 
+ #ifdef LOCALE
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -76,7 +76,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] dates ...", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] dates ...", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+--- nmh-0.27/uip/dropsbr.c.security	Fri Feb 13 00:57:21 1998
++++ nmh-0.27/uip/dropsbr.c	Sat Jul 18 14:04:48 1998
+@@ -355,12 +355,12 @@
+ 			char tmpbuffer[BUFSIZ];
+ 			char *tp, *ep, *fp;
+ 
+-			strcpy(tmpbuffer, buffer);
++			strncpy(tmpbuffer, buffer, BUFSIZ);
+ 			ep = tmpbuffer + 13;
+ 			if (!(fp = strchr(ep + 1, ' ')))
+ 			    fp = strchr(ep + 1, '\n');
+ 			tp = dctime(dlocaltimenow());
+-			sprintf (buffer, "From %.*s  %s", fp - ep, ep, tp);
++			snprintf (buffer, BUFSIZ, "From %.*s  %s", fp - ep, ep, tp);
+ 		    } else if (!strncmp (buffer, "X-Envelope-From:", 16)) {
+ 			/*
+ 			 * Change the "X-Envelope-From:" field
+@@ -369,9 +369,9 @@
+ 			char tmpbuffer[BUFSIZ];
+ 			char *ep;
+ 
+-			strcpy(tmpbuffer, buffer);
++			strncpy(tmpbuffer, buffer, BUFSIZ);
+ 			ep = tmpbuffer + 17;
+-			sprintf (buffer, "From %s", ep);
++			snprintf (buffer, BUFSIZ, "From %s", ep);
+ 		    } else if (strncmp (buffer, "From ", 5)) {
+ 			/*
+ 			 * If there is already a "From " line,
+@@ -380,11 +380,11 @@
+ 			char tmpbuffer[BUFSIZ];
+ 			char *tp, *ep;
+ 
+-			strcpy(tmpbuffer, buffer);
++			strncpy(tmpbuffer, buffer, BUFSIZ);
+ 			ep = "nobody@nowhere";
+ 			tp = dctime(dlocaltimenow());
+-			sprintf (buffer, "From %s  %s", ep, tp);
+-			strcat (buffer, tmpbuffer);
++			snprintf (buffer, BUFSIZ, "From %s  %s", ep, tp);
++			strncat (buffer, tmpbuffer, BUFSIZ-strlen(buffer));
+ 		    }
+ 		}
+ 
+@@ -469,9 +469,9 @@
+     if ((dp = strchr(cp = r1bindex (file, '/'), '.')) == NULL)
+ 	dp = cp + strlen (cp);
+     if (cp == file)
+-	sprintf (buffer, ".%.*s%s", dp - cp, cp, ".map");
++	snprintf (buffer, BUFSIZ, ".%.*s%s", dp - cp, cp, ".map");
+     else
+-	sprintf (buffer, "%.*s.%.*s%s", cp - file, file, dp - cp, cp, ".map");
++	snprintf (buffer, BUFSIZ, "%.*s.%.*s%s", cp - file, file, dp - cp, cp, ".map");
+ 
+     return buffer;
+ }
+--- nmh-0.27/uip/flist.c.security	Fri May  8 13:02:18 1998
++++ nmh-0.27/uip/flist.c	Sat Jul 18 14:04:48 1998
+@@ -114,7 +114,7 @@
+     char *cp, **ap;
+     char **argp, **lastArg;
+     char *arguments[MAXARGS];
+-    char buf[100];
++    char buf[BUFSIZ];
+ 
+ #ifdef LOCALE
+     setlocale(LC_ALL, "");
+@@ -130,11 +130,11 @@
+ 
+     if ((cp = context_find(invo_name)) != NULL) {
+ 	ap = brkstring(cp = getcpy(cp), " ", "\n");
+-	ap = copyip(ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    lastArg = copyip(argv + 1, ap);
++    lastArg = copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+     argc = lastArg - argp;
+     foldersToDo = (char **) malloc(argc * sizeof(char *));
+@@ -150,7 +150,7 @@
+ 		adios(NULL, "-%s unknown", cp);
+ 
+ 	    case HELPSW:
+-		sprintf(buf, "%s [+folder1 [+folder2 ...]][switches]", invo_name);
++		snprintf(buf, BUFSIZ, "%s [+folder1 [+folder2 ...]][switches]", invo_name);
+ 		print_help(buf, switches, 1);
+ 		done(1);
+ 	    case VERSIONSW:
+@@ -278,7 +278,7 @@
+ 
+     if (nFoldersToDo > 0) {
+ 	/* Update context */
+-	strcpy (curfolder, foldersToDo[nFoldersToDo - 1]);
++	strncpy (curfolder, foldersToDo[nFoldersToDo - 1], BUFSIZ);
+ 	context_replace (pfolder, curfolder);/* update current folder */
+ 	context_save ();                     /* save the context file */
+ 
+@@ -379,10 +379,10 @@
+ 	}
+ 	if (dp->d_name[0] == '.')
+ 	    continue;
+-	strcpy(name, base);
++	strncpy(name, base, sizeof(name)-2);
+ 	if (*base)
+ 	    strcat(name, "/");
+-	strcat(name, dp->d_name);
++	strncat(name, dp->d_name, sizeof(name)-strlen(name));
+ 	if ((stat(name, &st) != -1) && S_ISDIR(st.st_mode)) {
+ 	    /*
+ 	     * Check if this was really a symbolic link pointing
+@@ -501,9 +501,9 @@
+     for (i = 0; i < nFolders; ++i) {
+ 	/* Add `+' to end of name of current folder */
+ 	if (strcmp(curfolder, folders[i].name))
+-	    sprintf(tmpname, "%s", folders[i].name);
++	    snprintf(tmpname, BUFSIZ, "%s", folders[i].name);
+ 	else
+-	    sprintf(tmpname, "%s+", folders[i].name);
++	    snprintf(tmpname, BUFSIZ, "%s+", folders[i].name);
+ 
+ 	if (folders[i].error) {
+ 	    printf("%-*s is unreadable\n", maxlen+1, tmpname);
+@@ -610,7 +610,7 @@
+     char atrcur[BUFSIZ];
+     register struct node *np;
+ 
+-    sprintf (atrcur, "atr-%s-", current);
++    snprintf (atrcur, BUFSIZ,  "atr-%s-", current);
+     atrlen = strlen (atrcur);
+ 
+     context_read ();
+--- nmh-0.27/uip/fmtdump.c.security	Sun Jan 25 05:31:29 1998
++++ nmh-0.27/uip/fmtdump.c	Sat Jul 18 16:25:59 1998
+@@ -44,7 +44,7 @@
+ {
+     int ncomps;
+     char *cp, *form = NULL, *format = NULL;
+-    char buf[100], **ap, **argp;
++    char buf[BUFSIZ], **ap, **argp;
+     char *nfs, *arguments[MAXARGS];
+     struct format *fmt;
+ 
+@@ -52,13 +52,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, BUFSIZ);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, BUFSIZ);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -71,7 +71,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches]", invo_name);
++		    snprintf (buf, BUFSIZ,"%s [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -434,7 +434,8 @@
+ 	case FT_V_MATCH: return("V_MATCH");
+ 	case FT_V_AMATCH: return("V_AMATCH");
+ 	default:
+-		printf(buf, "/* ??? #%d */", t);
++		/* Note - this isnt just security it was *wrong* in the original  - AC*/
++		snprintf(buf, sizeof(buf), "/* ??? #%d */", t);
+ 		return(buf);
+ 	}
+ }
+--- nmh-0.27/uip/folder.c.security	Sun Jun  7 16:00:33 1998
++++ nmh-0.27/uip/folder.c	Sat Jul 18 16:28:40 1998
+@@ -132,7 +132,7 @@
+     int printsw = 0, listsw = 0;
+     int pushsw = 0, popsw = 0;
+     char *cp, *dp, *msg = NULL, *argfolder = NULL;
+-    char **ap, **argp, buf[100], *arguments[MAXARGS];
++    char **ap, **argp, buf[BUFSIZ], *arguments[MAXARGS];
+     struct stat st;
+ 
+ #ifdef LOCALE
+@@ -147,13 +147,13 @@
+     if (argv[0][strlen (argv[0]) - 1] == 's')
+ 	all = 1;
+ 
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -166,7 +166,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msg] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msg] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -269,7 +269,7 @@
+ 	}
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     nmhdir = concat (m_maildir (""), "/", NULL);
+ 
+@@ -285,7 +285,7 @@
+ 	if (!argfolder) {
+ 	    /* If no folder is given, the current folder and */
+ 	    /* the top of the folder stack are swapped.      */
+-	    if ((cp = context_find (stack))) {
++	    if ((cp = context_find (stack)) != NULL) {
+ 		dp = getcpy (cp);
+ 		ap = brkstring (dp, " ", "\n");
+ 		argfolder = getcpy(*ap++);
+@@ -309,7 +309,7 @@
+     if (popsw) {
+ 	if (argfolder)
+ 	    adios (NULL, "sorry, no folders allowed with -pop");
+-	if ((cp = context_find (stack))) {
++	if ((cp = context_find (stack)) != NULL) {
+ 	    dp = getcpy (cp);
+ 	    ap = brkstring (dp, " ", "\n");
+ 	    argfolder = getcpy(*ap++);
+@@ -339,7 +339,7 @@
+     /* Listing the folder stack */
+     if (listsw) {
+ 	printf ("%s", argfolder ? argfolder : getfolder (1));
+-	if ((cp = context_find (stack))) {
++	if ((cp = context_find (stack)) != NULL) {
+ 	    dp = getcpy (cp);
+ 	    for (ap = brkstring (dp, " ", "\n"); *ap; ap++)
+ 		printf (" %s", *ap);
+@@ -388,13 +388,13 @@
+ 		dodir (folder);
+ 	}
+     } else {
+-	strcpy (folder, argfolder ? argfolder : getfolder (1));
++	strncpy (folder, argfolder ? argfolder : getfolder (1), BUFSIZ);
+ 
+ 	/*
+ 	 * Check if folder exists.  If not, then see if
+ 	 * we should create it, or just exit.
+ 	 */
+-	if (stat (strcpy (buf, m_maildir (folder)), &st) == -1) {
++	if (stat (strncpy (buf, m_maildir (folder), BUFSIZ), &st) == -1) {
+ 	    if (errno != ENOENT)
+ 		adios (buf, "error on folder");
+ 	    if (fcreat == 0) {
+@@ -444,7 +444,7 @@
+     if (chdir (nmhdir) == NOTOK)
+ 	adios (nmhdir, "unable to change directory to");
+ 
+-    addir (strcpy (buffer, dir));
++    addir (strncpy (buffer, dir, BUFSIZ));
+ 
+     for (i = start; i < foldp; i++) {
+ 	get_folder_info (folds[i], NULL);
+@@ -609,9 +609,9 @@
+ 
+ 	    /* Add `+' to end of name, if folder is current */
+ 	    if (strcmp (folder, fi[i].name))
+-		sprintf (tmpname, "%s", fi[i].name);
++		snprintf (tmpname, BUFSIZ, "%s", fi[i].name);
+ 	    else
+-		sprintf (tmpname, "%s+", fi[i].name);
++		snprintf (tmpname, BUFSIZ, "%s+", fi[i].name);
+ 
+ 	    if (fi[i].error) {
+ 		printf ("%-*s is unreadable\n", maxlen+1, tmpname);
+@@ -809,7 +809,7 @@
+     char atrcur[BUFSIZ];
+     register struct node *np;
+ 
+-    sprintf (atrcur, "atr-%s-", current);
++    snprintf (atrcur, BUFSIZ, "atr-%s-", current);
+     atrlen = strlen (atrcur);
+ 
+     context_read ();
+--- nmh-0.27/uip/forw.c.security	Wed Jul  1 00:16:26 1998
++++ nmh-0.27/uip/forw.c	Sat Jul 18 16:29:17 1998
+@@ -125,7 +125,7 @@
+     char *cp, *cwd, *maildir, *dfolder = NULL;
+     char *dmsg = NULL, *digest = NULL, *ed = NULL;
+     char *file = NULL, *filter = NULL, *folder = NULL;
+-    char *form = NULL, buf[100], value[10], **ap;
++    char *form = NULL, buf[BUFSIZ], value[10], **ap;
+     char **argp, *arguments[MAXARGS], *msgs[MAXARGS];
+     struct stat st;
+ 
+@@ -137,13 +137,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, BUFSIZ);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, BUFSIZ);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -156,7 +156,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msgs] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -289,7 +289,7 @@
+ 
+     cwd = getcpy (pwd ());
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (file && (msgp || folder))
+ 	adios (NULL, "can't mix files and folders/msgs");
+@@ -297,13 +297,13 @@
+ try_it_again:
+ 
+ #ifdef MHE
+-    strcpy (drft, buildsw ? m_maildir ("draft")
+-			  : m_draft (dfolder, NULL, NOUSE, &isdf));
++    strncpy (drft, buildsw ? m_maildir ("draft")
++			  : m_draft (dfolder, NULL, NOUSE, &isdf), BUFSIZ);
+ 
+     /* Check if a draft already exists */
+     if (!buildsw && stat (drft, &st) != NOTOK) {
+ #else
+-    strcpy (drft, m_draft (dfolder, dmsg, NOUSE, &isdf));
++    strncpy (drft, m_draft (dfolder, dmsg, NOUSE, &isdf), BUFSIZ);
+ 
+     /* Check if a draft already exists */
+     if (stat (drft, &st) != NOTOK) {
+@@ -371,7 +371,7 @@
+      */
+     if (digest) {
+ 	if (issue == 0) {
+-	    sprintf (buf, IFORMAT, digest);
++	    snprintf (buf, BUFSIZ,IFORMAT, digest);
+ 	    if (volume == 0
+ 		    && (cp = context_find (buf))
+ 		    && ((issue = atoi (cp)) < 0))
+@@ -379,7 +379,7 @@
+ 	    issue++;
+ 	}
+ 	if (volume == 0)
+-	    sprintf (buf, VFORMAT, digest);
++	    snprintf (buf, BUFSIZ, VFORMAT, digest);
+ 	    if ((cp = context_find (buf)) == NULL || (volume = atoi (cp)) <= 0)
+ 		volume = 1;
+ 	if (!form)
+@@ -426,10 +426,10 @@
+ 	close (out);
+ 
+ 	if (digest) {
+-	    sprintf (buf, IFORMAT, digest);
++	    snprintf (buf, BUFSIZ, IFORMAT, digest);
+ 	    sprintf (value, "%d", issue);
+ 	    context_replace (buf, getcpy (value));
+-	    sprintf (buf, VFORMAT, digest);
++	    snprintf (buf, BUFSIZ, VFORMAT, digest);
+ 	    sprintf (value, "%d", volume);
+ 	    context_replace (buf, getcpy (value));
+ 	}
+@@ -507,7 +507,7 @@
+ 	    if (mp->numsel >= MAXARGS - i)
+ 		adios (NULL, "more than %d messages for %s exec",
+ 			vec[0], MAXARGS - i);
+-	    for (msgnum = mp->lowsel; msgnum <= mp->hghsel; msgnum++)
++	    for (msgnum = mp->lowsel; msgnum <= mp->hghsel && i<MAXARGS-1; msgnum++)
+ 		if (is_selected (mp, msgnum))
+ 		    vec[i++] = getcpy (m_name (msgnum));
+ 	    vec[i] = NULL;
+@@ -544,13 +544,13 @@
+     for (msgnum = mp->lowsel; msgnum <= mp->hghsel; msgnum++) {
+ 	if (is_selected (mp, msgnum)) {
+ 	    if (digest)
+-		strcpy (buffer, msgnum == mp->lowsel ? delim3 : delim4);
++		strncpy (buffer, msgnum == mp->lowsel ? delim3 : delim4, BUFSIZ);
+ 	    else {
+-		strcpy (bp = buffer, "\n-------"), bp += strlen (bp);
++		strncpy (bp = buffer, "\n-------", BUFSIZ-3), bp += strlen (bp);
+ 		if (msgnum == mp->lowsel)
+-		    sprintf (bp, " Forwarded Message%s", mp->numsel > 1 ? "s" : "");
++		    snprintf (bp, BUFSIZ-(bp-buffer)-2," Forwarded Message%s", mp->numsel > 1 ? "s" : "");
+ 		else
+-		    sprintf (bp, " Message %d", msgcnt);
++		    snprintf (bp, BUFSIZ-(bp-buffer)-2, " Message %d", msgcnt);
+ 		bp += strlen (bp);
+ 		strcpy (bp, "\n\n");
+ 	    }
+@@ -578,13 +578,13 @@
+     if (digest) {
+ 	strcpy (buffer, delim4);
+     } else {
+-	sprintf (buffer, "\n------- End of Forwarded Message%s\n\n",
++	snprintf (buffer, BUFSIZ, "\n------- End of Forwarded Message%s\n\n",
+ 		mp->numsel > 1 ? "s" : "");
+     }
+     write (out, buffer, strlen (buffer));
+ 
+     if (digest) {
+-	sprintf (buffer, "End of %s Digest [Volume %d Issue %d]\n", digest, volume, issue);
++	snprintf (buffer, BUFSIZ, "End of %s Digest [Volume %d Issue %d]\n", digest, volume, issue);
+ 	i = strlen (buffer);
+ 	for (bp = buffer + i; i > 1; i--)
+ 	    *bp++ = '*';
+@@ -605,12 +605,12 @@
+     int msgnum;
+     char buffer[BUFSIZ];
+ 
+-    sprintf (buffer, "#forw [forwarded message%s] +%s",
++    snprintf (buffer, BUFSIZ, "#forw [forwarded message%s] +%s",
+ 	mp->numsel == 1 ? "" : "s", mp->foldpath);
+     write (out, buffer, strlen (buffer));
+     for (msgnum = mp->lowsel; msgnum <= mp->hghsel; msgnum++)
+ 	if (is_selected (mp, msgnum)) {
+-	    sprintf (buffer, " %s", m_name (msgnum));
++	    snprintf (buffer, BUFSIZ, " %s", m_name (msgnum));
+ 	    write (out, buffer, strlen (buffer));
+ 	}
+     write (out, "\n", 1);
+@@ -647,7 +647,7 @@
+     dat[3] = fmtsize;
+     dat[4] = 0;
+ 
+-    strcpy (tmpfil, m_tmpfil (invo_name));
++    strncpy (tmpfil, m_tmpfil (invo_name), BUFSIZ);
+     if ((tmp = fopen (tmpfil, "w+")) == NULL)
+ 	adios (tmpfil, "unable to create");
+     unlink (tmpfil);
+--- nmh-0.27/uip/ftpsbr.c.security	Wed Feb 25 17:29:11 1998
++++ nmh-0.27/uip/ftpsbr.c	Sat Jul 18 14:04:48 1998
+@@ -99,6 +99,7 @@
+ {
+     register int eindex;
+     char *fmt;
++    int len=BUFSIZ;
+ 
+     eindex = errno;
+ 
+@@ -106,7 +107,7 @@
+     fmt = va_arg (ap, char *);
+ 
+     if (fmt) {
+-	vsprintf(bp, fmt, ap);
++	len-=vsnprintf(bp, len, fmt, ap);
+ 	bp += strlen(bp);
+     }
+ 
+@@ -114,13 +115,16 @@
+ 	char *s;
+ 
+ 	if (*what) {
+-	    sprintf (bp, " %s: ", what);
++	    len-=snprintf (bp, len, " %s: ", what);
+ 	    bp += strlen (bp);
+ 	}
+ 	if ((s = strerror(eindex)))
+-	    strcpy (bp, s);
++	{
++	    strncpy (bp, s, len);
++	    len-=strlen(s);
++	}
+ 	else
+-	    sprintf (bp, "Error %d", eindex);
++	    len-=snprintf(bp, len,"Error %d", eindex);
+ 	bp += strlen (bp);
+     }
+ 
+--- nmh-0.27/uip/inc.c.security	Sat May 16 17:28:30 1998
++++ nmh-0.27/uip/inc.c	Sat Jul 18 16:29:50 1998
+@@ -165,7 +165,7 @@
+     char *format = NULL, *form = NULL;
+     char *newmail, *host = NULL;
+     char *audfile = NULL, *from = NULL;
+-    char buf[100], **ap;
++    char buf[BUFSIZ], **ap;
+     char **argp, *nfs, *arguments[MAXARGS];
+     char *user = NULL;
+     struct msgs *mp;
+@@ -218,13 +218,13 @@
+ 	snoop++;
+ #endif /* POP */
+ 
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -237,7 +237,7 @@
+ 		adios (NULL, "-%s unknown", cp);
+ 
+ 	    case HELPSW: 
+-		snprintf (buf, 100, "%s [+folder] [switches]", invo_name);
++		snprintf (buf, BUFSIZ, "%s [+folder] [switches]", invo_name);
+ 		print_help (buf, switches, 1);
+ 		done (1);
+ 	    case VERSIONSW:
+@@ -450,7 +450,7 @@
+ 	goto go_to_it;
+ #endif /* POP */
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (!folder)
+ 	folder = getfolder (0);
+@@ -532,7 +532,7 @@
+     }
+ 
+ #ifdef MHE
+-    if (context_find ("mhe")) {
++    if (context_find ("mhe") != NULL) {
+ 	cp = concat (maildir, "/++", NULL);
+ 	i = stat (cp, &st);
+ 	if ((mhe = fopen (cp, "a")) == NULL)
+--- nmh-0.27/uip/install-mh.c.security	Tue Jun 30 22:47:48 1998
++++ nmh-0.27/uip/install-mh.c	Sat Jul 18 14:04:48 1998
+@@ -38,7 +38,7 @@
+ {
+     int i, autof = 0;
+     char *cp, *path;
+-    char buf[100], *dp;
++    char buf[BUFSIZ], *dp;
+     char *arguments[MAXARGS], **argp;
+     struct node *np;
+     struct passwd *pw;
+@@ -49,7 +49,7 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    copyip (argv + 1, arguments);
++    copyip_n (argv + 1, arguments, MAXARGS);
+     argp = arguments;
+ 
+     while ((dp = *argp++)) {
+@@ -62,7 +62,7 @@
+ 		    adios (NULL, "-%s unknown\n", dp);
+ 
+ 		case HELPSW:
+-		    sprintf (buf, "%s [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches]", invo_name);
+ 		    print_help (buf, switches, 0);
+ 		    done (1);
+ 		case VERSIONSW:
+--- nmh-0.27/uip/mark.c.security	Wed Jan 14 21:09:46 1998
++++ nmh-0.27/uip/mark.c	Sat Jul 18 16:30:08 1998
+@@ -48,7 +48,7 @@
+     int addsw = 0, deletesw = 0, debugsw = 0;
+     int listsw = 0, publicsw = -1, zerosw = 0;
+     int seqp = 0, msgp = 0, msgnum;
+-    char *cp, *maildir, *folder = NULL, buf[100];
++    char *cp, *maildir, *folder = NULL, buf[BUFSIZ];
+     char **ap, **argp, *arguments[MAXARGS];
+     char *seqs[NUMATTRS + 1], *msgs[MAXARGS];
+     struct msgs *mp;
+@@ -57,13 +57,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -76,7 +76,7 @@
+ 		    adios (NULL, "-%s unknown\n", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msgs] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -146,7 +146,7 @@
+ 	    listsw++;
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (!msgp)
+ 	msgs[msgp++] = listsw ? "all" :"cur";
+--- nmh-0.27/uip/mhbuild.c.security	Sun Jun 21 21:41:42 1998
++++ nmh-0.27/uip/mhbuild.c	Sat Jul 18 16:30:56 1998
+@@ -122,7 +122,7 @@
+ {
+     int sizesw = 1, headsw = 1;
+     int *icachesw;
+-    char *cp, buf[100];
++    char *cp, buf[BUFSIZ];
+     char buffer[BUFSIZ], *compfile = NULL;
+     char **ap, **argp, *arguments[MAXARGS];
+     CT ct, cts[2];
+@@ -133,13 +133,13 @@
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+ 
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -161,7 +161,7 @@
+ 		adios (NULL, "-%s unknown", cp);
+ 
+ 	    case HELPSW: 
+-		sprintf (buf, "%s [switches] file", invo_name);
++		snprintf (buf,  BUFSIZ, "%s [switches] file", invo_name);
+ 		print_help (buf, switches, 1);
+ 		done (1);
+ 	    case VERSIONSW:
+@@ -272,13 +272,13 @@
+     }
+ 
+     /* Check for public cache location */
+-    sprintf (buf, "%s-cache", invo_name);
++    snprintf (buf, BUFSIZ, "%s-cache", invo_name);
+     if ((cache_public = context_find (buf)) && *cache_public != '/')
+ 	cache_public = NULL;
+ 
+     /* Check for private cache location */
+-    sprintf (buf, "%s-private-cache", invo_name);
+-    if (!(cache_private = context_find (buf)))
++    snprintf (buf, BUFSIZ, "%s-private-cache", invo_name);
++    if ((cache_private = context_find (buf)) == NULL)
+ 	cache_private = ".cache";
+     cache_private = getcpy (m_maildir (cache_private));
+ 
+@@ -287,13 +287,13 @@
+      * will store temporary files there.  Else we
+      * store them in standard nmh directory.
+      */
+-    sprintf (buf, "%s-storage", invo_name);
++    snprintf (buf, BUFSIZ,"%s-storage", invo_name);
+     if ((cp = context_find (buf)) && *cp)
+ 	tmp = concat (cp, "/", invo_name, NULL);
+     else
+ 	tmp = add (m_maildir (invo_name), NULL);
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+ 
+     /* Check if we have a file to process */
+@@ -359,7 +359,7 @@
+ 	list_all_messages (cts, headsw, sizesw, verbosw, debugsw);
+ 
+     /* Rename composition draft */
+-    sprintf (buffer, "%s.orig", m_backup (compfile));
++    snprintf (buffer, BUFSIZ, "%s.orig", m_backup (compfile));
+     if (rename (compfile, buffer) == NOTOK)
+ 	adios (compfile, "unable to rename %s to", buffer);
+ 
+--- nmh-0.27/uip/mhlsbr.c.security	Mon May 25 02:32:59 1998
++++ nmh-0.27/uip/mhlsbr.c	Sat Jul 18 14:04:48 1998
+@@ -294,7 +294,7 @@
+     int width = 0, vecp = 0, i;
+     char *cp, *folder = NULL;
+     char *form = NULL, **ap, **argp;
+-    char buf[80], *arguments[MAXARGS], *files[MAXARGS];
++    char buf[BUFSIZ], *arguments[MAXARGS], *files[MAXARGS];
+ 
+     invo_name = r1bindex (argv[0], '/');
+ 
+@@ -303,11 +303,11 @@
+ 
+     if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     if ((cp = getenv ("FACEPROC")))
+@@ -324,7 +324,7 @@
+ 		    adios (NULL, "-%s unknown\n", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] [files ...]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] [files ...]", invo_name);
+ 		    print_help (buf, mhlswitches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -460,10 +460,10 @@
+ 	if (digest) {
+ 	    printf ("%s", delim4);
+ 	    if (volume == 0) {
+-	       sprintf (buf, "End of %s Digest\n", digest);
++	       snprintf (buf, BUFSIZ, "End of %s Digest\n", digest);
+ 	     }
+ 	    else
+-	      sprintf (buf, "End of %s Digest [Volume %d Issue %d]\n", digest, volume, issue);
++	      snprintf (buf, BUFSIZ, "End of %s Digest [Volume %d Issue %d]\n", digest, volume, issue);
+ 	    i = strlen (buf);
+ 	    for (cp = buf + i; i > 1; i--)
+ 		*cp++ = '*';
+@@ -636,7 +636,7 @@
+ 
+     if (!*parptr)
+ 	return 0;
+-    strcpy (name, parse ());
++    strncpy (name, parse (), NAMESZ);
+ 
+     if (!strcasecmp (name, "component")) {
+ 	if (ptos (name, &c1->c_text))
+@@ -744,7 +744,7 @@
+     char *cp;
+     static char result[NAMESZ];
+ 
+-    for (cp = result; *parptr; parptr++) {
++    for (cp = result; *parptr; parptr++ && cp-result < NAMESZ) {
+ 	c = *parptr;
+ 	if (isalnum (c)
+ 		|| c == '.'
+--- nmh-0.27/uip/mhn.c.security	Fri Jun 19 03:24:28 1998
++++ nmh-0.27/uip/mhn.c	Sat Jul 18 16:31:50 1998
+@@ -218,7 +218,7 @@
+     int sizesw = 1, headsw = 1;
+     int msgp = 0, msgnum, *icachesw;
+     char *cp, *file = NULL, *folder = NULL;
+-    char *maildir, buf[100], **ap, **argp;
++    char *maildir, buf[BUFSIZ], **ap, **argp;
+     char *arguments[MAXARGS], *msgs[MAXARGS];
+     struct msgs *mp = NULL;
+     CT ct, *ctp;
+@@ -228,13 +228,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -247,7 +247,7 @@
+ 		adios (NULL, "-%s unknown", cp);
+ 
+ 	    case HELPSW: 
+-		sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		snprintf (buf, BUFSIZ, "%s [+folder] [msgs] [switches]", invo_name);
+ 		print_help (buf, switches, 1);
+ 		done (1);
+ 	    case VERSIONSW:
+@@ -468,13 +468,13 @@
+     }
+ 
+     /* Check for public cache location */
+-    sprintf (buf, "%s-cache", invo_name);
++    snprintf (buf, BUFSIZ, "%s-cache", invo_name);
+     if ((cache_public = context_find (buf)) && *cache_public != '/')
+ 	cache_public = NULL;
+ 
+     /* Check for private cache location */
+-    sprintf (buf, "%s-private-cache", invo_name);
+-    if (!(cache_private = context_find (buf)))
++    snprintf (buf, BUFSIZ,"%s-private-cache", invo_name);
++    if ((cache_private = context_find (buf)) == NULL)
+ 	cache_private = ".cache";
+     cache_private = getcpy (m_maildir (cache_private));
+ 
+@@ -488,13 +488,13 @@
+      * then store temporary files there.  Else we
+      * store them in standard nmh directory.
+      */
+-    sprintf (buf, "%s-storage", invo_name);
++    snprintf (buf, BUFSIZ, "%s-storage", invo_name);
+     if ((cp = context_find (buf)) && *cp)
+ 	tmp = concat (cp, "/", invo_name, NULL);
+     else
+ 	tmp = add (m_maildir (invo_name), NULL);
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+ 
+     /*
+--- nmh-0.27/uip/mhmail.c.security	Wed Jan 14 21:10:29 1998
++++ nmh-0.27/uip/mhmail.c	Sat Jul 18 14:04:48 1998
+@@ -73,7 +73,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [addrs ... [switches]]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [addrs ... [switches]]", invo_name);
+ 		    print_help (buf, switches, 0);
+ 		    done (1);
+ 		case VERSIONSW:
+--- nmh-0.27/uip/mhparam.c.security	Thu Jan 22 17:53:01 1998
++++ nmh-0.27/uip/mhparam.c	Sat Jul 18 16:32:07 1998
+@@ -83,17 +83,17 @@
+     int i, compp = 0, missed = 0;
+     int all = 0, debug = 0;
+     int components = -1;
+-    char *cp, buf[100], **ap, **argp;
++    char *cp, buf[BUFSIZ], **ap, **argp;
+     char *arguments[MAXARGS], *comps[MAXARGS];
+ 
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -106,7 +106,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [profile-components] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [profile-components] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+--- nmh-0.27/uip/mhpath.c.security	Wed Jan 14 21:11:15 1998
++++ nmh-0.27/uip/mhpath.c	Sat Jul 18 16:32:32 1998
+@@ -28,7 +28,7 @@
+     int i, maxmsgs, msgp = 0;
+     char *cp, *maildir, *folder = NULL;
+     char **ap, **argp, **msgs;
+-    char *arguments[MAXARGS], buf[100];
++    char *arguments[MAXARGS], buf[BUFSIZ];
+     struct msgs *mp;
+ 
+ #ifdef LOCALE
+@@ -37,11 +37,11 @@
+     invo_name = r1bindex (argv[0], '/');
+     if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     /* Allocate initial space to record message/sequence names */
+@@ -59,7 +59,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ ,"%s [+folder] [msgs] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -82,7 +82,7 @@
+ 	}
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+ 
+     if (!folder)
+--- nmh-0.27/uip/msgchk.c.security	Sat May 16 17:29:34 1998
++++ nmh-0.27/uip/msgchk.c	Sat Jul 18 16:33:01 1998
+@@ -122,13 +122,13 @@
+ 	snoop++;
+ #endif
+ 
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -173,7 +173,8 @@
+ 		case USERSW: 
+ 		    if (!(cp = *argp++) || *cp == '-')
+ 			adios (NULL, "missing argument to %s", argp[-2]);
+-		    vec[vecp++] = cp;
++		    if (vecp < 50)
++			vec[vecp++] = cp;
+ 		    continue;
+ 
+ 		case APOPSW: 
+@@ -194,7 +195,8 @@
+ 		    snoop++;
+ 		    continue;
+ 	    }
+-	vec[vecp++] = cp;
++	if (vecp<50)
++		vec[vecp++] = cp;
+     }
+ 
+ #ifdef POP
+--- nmh-0.27/uip/msh.c.security	Mon Jun 22 16:12:35 1998
++++ nmh-0.27/uip/msh.c	Sat Jul 18 16:33:12 1998
+@@ -236,7 +236,7 @@
+ {
+     int	id = 0, scansw = 0, vmh1 = 0, vmh2 = 0;
+     char *cp, *file = NULL, *folder = NULL;
+-    char **ap, **argp, buf[80];
++    char **ap, **argp, buf[BUFSIZ];
+     char *arguments[MAXARGS];
+ #ifdef BPOP
+     int	pmsh1 = 0, pmsh2 = 0;
+@@ -247,13 +247,13 @@
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+     mts_init (invo_name);
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -266,7 +266,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] file", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] file", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -486,7 +486,7 @@
+     register struct Cmd *cmdp;
+     static int once_only = ADVCMD;
+ 
+-    sprintf (prompt, myprompt, invo_name);
++    snprintf (prompt, BUFSIZ, myprompt, invo_name);
+     cmdp = &typein;
+ 
+     for (;;) {
+@@ -537,7 +537,7 @@
+ 	    case SORTCMD: 
+ 		if ((cp = context_find (cmd_name)) != NULL) {
+ 		    ap = brkstring (cp = getcpy (cp), " ", "\n");
+-		    ap = copyip (ap, vec);
++		    ap = copyip_n (ap, vec, MAXARGS);
+ 		}
+ 		else
+ 		    ap = vec;
+@@ -548,7 +548,7 @@
+ 		ap = vec;
+ 		break;
+ 	}
+-	copyip (cmdp->args + 1, ap);
++	copyip_n (cmdp->args + 1, ap, MAXARGS);
+ 
+ 	m_init ();
+ 
+@@ -726,7 +726,7 @@
+ 
+ #ifdef BPOP
+     if (pmsh) {
+-	strcpy (tmpfil, m_tmpfil (invo_name));
++	strncpy (tmpfil, m_tmpfil (invo_name), BUFSIZ);
+ 	if ((fp = fopen (tmpfil, "w+")) == NULL)
+ 	    padios (tmpfil, "unable to create");
+ 	unlink (tmpfil);
+@@ -1126,7 +1126,7 @@
+ {
+     char buffer[BUFSIZ];
+ 
+-    sprintf (buffer, "%d-%d", low, hgh);
++    snprintf (buffer, BUFSIZ, "%d-%d", low, hgh);
+     scanstring (buffer);
+ }
+ 
+@@ -1138,7 +1138,7 @@
+ 
+     if ((cp = context_find (cmd_name = "scan")) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, vec);
++	ap = copyip_n (ap, vec, MAXARGS);
+     }
+     else
+ 	ap = vec;
+@@ -1291,7 +1291,7 @@
+ write_ids (void)
+ {
+     int i = 0, seqnum, msgnum;
+-    char buffer[80];
++    char buffer[BUFSIZ];
+ 
+     if (pfd <= 1)
+ 	return;
+@@ -1305,7 +1305,7 @@
+ 		    break;
+ 	    }
+ 
+-    sprintf (buffer, "%d %d\n", i, Msgs[mp->hghmsg].m_bboard_id);
++    snprintf (buffer, BUFSIZ, "%d %d\n", i, Msgs[mp->hghmsg].m_bboard_id);
+     write (pfd, buffer, sizeof(buffer));
+     close (pfd);
+     pfd = NOTOK;
+@@ -1381,8 +1381,8 @@
+     if (rename (tmpfil, mp->foldpath) == NOTOK)
+ 	admonish (mp->foldpath, "unable to rename %s to", tmpfil);
+     else {
+-	strcpy (map1, map_name (tmpfil));
+-	strcpy (map2, map_name (mp->foldpath));
++	strncpy (map1, map_name (tmpfil), BUFSIZ);
++	strncpy (map2, map_name (mp->foldpath), BUFSIZ);
+ 
+ 	if (rename (map1, map2) == NOTOK) {
+ 	    admonish (map2, "unable to rename %s to", map1);
+@@ -1662,7 +1662,7 @@
+ 	    return NOTOK;
+ 	}
+ 
+-    sprintf (path, "%s/%s", pp, cp ? cp : "");
++    snprintf (path, BUFSIZ, "%s/%s", pp, cp ? cp : "");
+     strcpy (redirect, path);
+     return OK;
+ }
+--- nmh-0.27/uip/mshcmds.c.security	Sun Feb  1 18:28:37 1998
++++ nmh-0.27/uip/mshcmds.c	Sat Jul 18 14:04:48 1998
+@@ -76,7 +76,7 @@
+     char *vec[MAXARGS];
+ 
+     vec[0] = r1bindex (pgm, '/');
+-    copyip (args, vec + 1);
++    copyip_n (args, vec + 1, MAXARGS);
+ 
+     if (fmsh) {
+ 	context_del (pfolder);
+@@ -164,7 +164,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case DIHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, distswit, 1);
+ 		    return;
+ 
+@@ -266,7 +266,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case EXHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, explswit, 1);
+ 		    return;
+ 
+@@ -495,7 +495,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case FIHELP: 
+-		    sprintf (buf, "%s +folder... [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s +folder... [msgs] [switches]", cmd_name);
+ 		    print_help (buf, fileswit, 1);
+ 		    return;
+ 
+@@ -657,7 +657,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case FLHELP: 
+-		    sprintf (buf, "%s [+folder] [msg] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msg] [switches]", cmd_name);
+ 		    print_help (buf, foldswit, 1);
+ 		    return;
+ 
+@@ -720,7 +720,7 @@
+ 	    }
+ 	}
+ 	else {
+-	    strcpy (buf, folder);
++	    strncpy (buf, folder, BUFSIZ);
+ 	    if (expand (buf) == NOTOK)
+ 		return;
+ 	    folder = buf;
+@@ -874,7 +874,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case FOHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, forwswit, 1);
+ 		    return;
+ 
+@@ -929,7 +929,7 @@
+     }
+ 
+ 					/* foil search of .mh_profile */
+-    sprintf (buf, "%sXXXXXX", invo_name);
++    snprintf (buf, BUFSIZ, "%sXXXXXX", invo_name);
+     vec[0] = (char *)mktemp (buf);
+     vec[vecp++] = "-file";
+     vec[vecp] = NULL;
+@@ -941,7 +941,7 @@
+     seq_setprev (mp);
+ 
+     if (filter) {
+-	strcpy (buf, filter);
++	strncpy (buf, filter, BUFSIZ);
+ 	if (expand (buf) == NOTOK)
+ 	    return;
+ 	if (access (filter = getcpy (etcpath (buf)), R_OK) == NOTOK) {
+@@ -961,10 +961,10 @@
+ forw (char *proc, char *filter, int vecp, char **vec)
+ {
+     int i, child_id, msgnum, msgcnt;
+-    char tmpfil[80], *args[MAXARGS];
++    char tmpfil[BUFSIZ], *args[MAXARGS];
+     FILE *out;
+ 
+-    strcpy (tmpfil, m_tmpfil (invo_name));
++    strncpy (tmpfil, m_tmpfil (invo_name), sizeof(tmpfil));
+     interrupted = 0;
+     if (filter)
+ 	switch (child_id = fork ()) {
+@@ -1132,7 +1132,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case MHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, markswit, 1);
+ 		    return;
+ 
+@@ -1355,7 +1355,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case MHNHELPSW:
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, mhnswit, 1);
+ 		    return;
+ 
+@@ -1464,7 +1464,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case PAHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, packswit, 1);
+ 		    return;
+ 
+@@ -1641,7 +1641,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case PIHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, pickswit, 1);
+ 		    return;
+ 
+@@ -1827,7 +1827,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case REHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, replswit, 1);
+ 		    return;
+ 
+@@ -1917,7 +1917,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case RMHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, rmmswit, 1);
+ 		    return;
+ 	    }
+@@ -1966,7 +1966,7 @@
+ 	else
+ 	    for (msgnum = mp->lowsel; msgnum <= mp->hghsel; msgnum++)
+ 		if (is_selected (mp, msgnum)) {
+-		    strcpy (buffer, m_backup (cp = m_name (msgnum)));
++		    strncpy (buffer, m_backup (cp = m_name (msgnum)),sizeof(buffer));
+ 		    if (rename (cp, buffer) == NOTOK)
+ 			admonish (buffer, "unable to rename %s to", cp);
+ 		}
+@@ -2058,7 +2058,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case SCHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, scanswit, 1);
+ 		    return;
+ 
+@@ -2304,7 +2304,7 @@
+ 		    vec[vecp++] = --cp;
+ 		    continue;
+ 		case SHHELP: 
+-		    sprintf (buf, "%s %s[switches] [switches for showproc]",
++		    snprintf (buf, BUFSIZ, "%s %s[switches] [switches for showproc]",
+ 			    cmd_name, mode ? NULL : "[msgs] ");
+ 		    print_help (buf, showswit, 1);
+ 		    return;
+@@ -2735,7 +2735,7 @@
+ 		    fprintf (stderr, "-%s unknown\n", cp);
+ 		    return;
+ 		case SOHELP: 
+-		    sprintf (buf, "%s [msgs] [switches]", cmd_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches]", cmd_name);
+ 		    print_help (buf, sortswit, 1);
+ 		    return;
+ 
+@@ -2972,7 +2972,7 @@
+ process (int msgnum, char *proc, int vecp, char **vec)
+ {
+     int	child_id, status;
+-    char tmpfil[80];
++    char tmpfil[BUFSIZ];
+     FILE *out;
+ 
+     if (fmsh) {
+@@ -2984,14 +2984,14 @@
+ 	goto ready;
+     }
+ 
+-    strcpy (tmpfil, m_scratch ("", invo_name));
++    strncpy (tmpfil, m_scratch ("", invo_name), BUFSIZ);
+     if ((out = fopen (tmpfil, "w")) == NULL) {
+ 	int     olderr;
+ 	extern int  errno;
+-	char    newfil[80];
++	char    newfil[BUFSIZ];
+ 
+ 	olderr = errno;
+-	strcpy (newfil, m_tmpfil (invo_name));
++	strncpy (newfil, m_tmpfil (invo_name), BUFSIZ);
+ 	if ((out = fopen (newfil, "w")) == NULL) {
+ 	    errno = olderr;
+ 	    advise (tmpfil, "unable to create temporary file");
+--- nmh-0.27/uip/packf.c.security	Wed Jan 14 21:14:15 1998
++++ nmh-0.27/uip/packf.c	Sat Jul 18 16:33:27 1998
+@@ -37,7 +37,7 @@
+ main (int argc, char **argv)
+ {
+     int msgp = 0, fd, msgnum;
+-    char *cp, *maildir, *msgnam, *folder = NULL, buf[100];
++    char *cp, *maildir, *msgnam, *folder = NULL, buf[BUFSIZ];
+     char **ap, **argp, *arguments[MAXARGS], *msgs[MAXARGS];
+     struct msgs *mp;
+     struct stat st;
+@@ -46,13 +46,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -65,7 +65,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msgs] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -94,7 +94,8 @@
+ 		adios (NULL, "only one folder at a time!");
+ 	    folder = path (cp + 1, *cp == '+' ? TFOLDER : TSUBCWF);
+ 	} else {
+-	    msgs[msgp++] = cp;
++	    if(msgp<MAXARGS-1)
++	    	msgs[msgp++] = cp;
+ 	}
+     }
+ 
+@@ -110,7 +111,7 @@
+ 	free (cp);
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (!msgp)
+ 	msgs[msgp++] = "all";
+--- nmh-0.27/uip/pick.c.security	Wed Jul  1 14:04:50 1998
++++ nmh-0.27/uip/pick.c	Sat Jul 18 16:23:13 1998
+@@ -69,7 +69,7 @@
+ {
+     int publicsw = -1, zerosw = 1, msgp = 0;
+     int seqp = 0, vecp = 0, lo, hi, msgnum;
+-    char *maildir, *folder = NULL, buf[100];
++    char *maildir, *folder = NULL, buf[BUFSIZ];
+     char *cp, **ap, **argp, *arguments[MAXARGS];
+     char *msgs[MAXARGS], *seqs[NUMATTRS + 1], *vec[MAXARGS];
+     struct msgs *mp;
+@@ -79,19 +79,20 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+ 	if (*cp == '-') {
+ 	    if (*++cp == '-') {
+-		vec[vecp++] = --cp;
++		if(vecp<MAXARGS-1)
++			vec[vecp++] = --cp;
+ 		goto pattern;
+ 	    }
+ 	    switch (smatch (cp, switches)) {
+@@ -102,7 +103,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ,"%s [+folder] [msgs] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    listsw = 0;	/* HACK */
+ 		    done (1);
+@@ -119,11 +120,13 @@
+ 		case AFTRSW: 
+ 		case BEFRSW: 
+ 		case SRCHSW: 
+-		    vec[vecp++] = --cp;
++		    if (vecp<MAXARGS-1)
++			vec[vecp++] = --cp;
+ pattern:
+ 		    if (!(cp = *argp++))/* allow -xyz arguments */
+ 			adios (NULL, "missing argument to %s", argp[-2]);
+-		    vec[vecp++] = cp;
++		    if (vecp<MAXARGS-1)
++			vec[vecp++] = cp;
+ 		    continue;
+ 		case OTHRSW: 
+ 		    adios (NULL, "internal error!");
+@@ -133,7 +136,8 @@
+ 		case NOTSW:
+ 		case LBRSW:
+ 		case RBRSW:
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 
+ 		case SEQSW: 
+@@ -171,12 +175,12 @@
+ 		adios (NULL, "only one folder at a time!");
+ 	    else
+ 		folder = path (cp + 1, *cp == '+' ? TFOLDER : TSUBCWF);
+-	else
+-	    msgs[msgp++] = cp;
++	else if(msgp<MAXARGS-1)
++	    	msgs[msgp++] = cp;
+     }
+     vec[vecp] = NULL;
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+ 
+     /*
+--- nmh-0.27/uip/picksbr.c.security	Thu Jan 22 17:57:50 1998
++++ nmh-0.27/uip/picksbr.c	Sat Jul 18 14:04:48 1998
+@@ -819,21 +819,21 @@
+     if ((ts = dlocaltimenow ()) == NULL)
+ 	return NULL;
+ 
+-    sprintf (buffer, "%s %s", ap, dtwszone (ts));
++    snprintf (buffer, BUFSIZ, "%s %s", ap, dtwszone (ts));
+     if ((tw = dparsetime (buffer)) != NULL)
+ 	return tw;
+ 
+-    sprintf (buffer, "%s %02d:%02d:%02d %s", ap,
++    snprintf (buffer, BUFSIZ, "%s %02d:%02d:%02d %s", ap,
+ 	    ts->tw_hour, ts->tw_min, ts->tw_sec, dtwszone (ts));
+     if ((tw = dparsetime (buffer)) != NULL)
+ 	return tw;
+ 
+-    sprintf (buffer, "%02d %s %04d %s",
++    snprintf (buffer, BUFSIZ, "%02d %s %04d %s",
+ 	    ts->tw_mday, tw_moty[ts->tw_mon], ts->tw_year, ap);
+     if ((tw = dparsetime (buffer)) != NULL)
+ 	return tw;
+ 
+-    sprintf (buffer, "%02d %s %04d %s %s",
++    snprintf (buffer, BUFSIZ, "%02d %s %04d %s %s",
+ 	    ts->tw_mday, tw_moty[ts->tw_mon], ts->tw_year,
+ 	    ap, dtwszone (ts));
+     if ((tw = dparsetime (buffer)) != NULL)
+--- nmh-0.27/uip/popi.c.security	Sat May 16 17:29:08 1998
++++ nmh-0.27/uip/popi.c	Sat Jul 18 16:33:50 1998
+@@ -91,7 +91,7 @@
+     int	autosw = 1, noisy = 1, rpop;
+     char *cp, *maildir, *folder = NULL, *form = NULL;
+     char *format = NULL, *host = NULL, *user = NULL;
+-    char *pass = NULL, buf[100], **ap, **argp;
++    char *pass = NULL, buf[BUFSIZ], **ap, **argp;
+     char *arguments[MAXARGS];
+     struct stat st;
+ 
+@@ -103,11 +103,11 @@
+ 	snoop++;
+     if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, BUFSIZ);
+     }
+     else
+ 	ap = arguments;
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, BUFSIZ);
+     argp = arguments;
+ 
+     rpop = getuid() && !geteuid();
+@@ -122,7 +122,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -209,7 +209,7 @@
+ 	setuid (getuid ());
+ 	ruserpass (host, &user, &pass);
+     }
+-    sprintf (mailname, "PO box for %s@%s", user, host);
++    snprintf (mailname, BUFSIZ, "PO box for %s@%s", user, host);
+ 
+     if (pop_init (host, user, pass, snoop, rpop) == NOTOK)
+ 	adios (NULL, "%s", response);
+@@ -219,7 +219,7 @@
+     /* get new format string */
+     nfs = new_fs (form, format, FORMAT);
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (!folder)
+ 	folder = getfolder (0);
+--- nmh-0.27/uip/popsbr.c.security	Thu Jan 22 17:58:27 1998
++++ nmh-0.27/uip/popsbr.c	Sat Jul 18 14:04:49 1998
+@@ -83,24 +83,24 @@
+     if ((cp = strchr (response, '<')) == NULL
+ 	    || (lp = strchr (cp, '>')) == NULL) {
+ 	sprintf (buffer, "APOP not available: %s", response);
+-	strcpy (response, buffer);
++	strncpy (response, buffer, BUFSIZ);
+ 	return NULL;
+     }
+ 
+     *++lp = NULL;
+-    sprintf (buffer, "%s%s", cp, pass);
++    snprintf (buffer, BUFSIZ, "%s%s", cp, pass);
+ 
+     MD5Init (&mdContext);
+     MD5Update (&mdContext, (unsigned char *) buffer,
+ 	       (unsigned int) strlen (buffer));
+     MD5Final (digest, &mdContext);
+ 
+-    sprintf (cp = buffer, "%s ", user);
++    snprintf (cp = buffer, BUFSIZ, "%s ", user);
+     cp += strlen (cp);
+     for (ep = (dp = digest) + sizeof digest / sizeof digest[0];
+ 	     dp < ep;
+ 	     cp += 2)
+-	sprintf (cp, "%02x", *dp++ & 0xff);
++	snprintf (cp, BUFSIZ-(cp-buffer), "%02x", *dp++ & 0xff);
+     *cp = NULL;
+ 
+     return buffer;
+@@ -136,7 +136,7 @@
+ # ifndef KPOP
+     if ((fd1 = client (host, "tcp", POPSERVICE, rpop, response)) == NOTOK)
+ # else	/* KPOP */
+-    sprintf (buffer, "%s/%s", POPSERVICE, "kpop");
++    snprintf (buffer, BUFSIZ, "%s/%s", POPSERVICE, "kpop");
+     if ((fd1 = client (host, "tcp", buffer, rpop, response)) == NOTOK)
+ # endif
+ #else	/* NNTP */
+@@ -148,9 +148,9 @@
+ 	char *s;
+ 
+ 	if ((s = strerror(errno)))
+-	    sprintf (response, "unable to dup connection descriptor: %s", s);
++	    snprintf (response, BUFSIZ, "unable to dup connection descriptor: %s", s);
+ 	else
+-	    sprintf (response, "unable to dup connection descriptor: unknown error");
++	    snprintf (response, BUFSIZ, "unable to dup connection descriptor: unknown error");
+ 	close (fd1);
+ 	return NOTOK;
+     }
+@@ -223,7 +223,7 @@
+ 
+ #ifdef NNTP
+     if (myname && *myname)
+-	strcpy (xtnd_name, myname);	/* interface from bbc to msh */
++	strcpy (xtnd_name, myname, 512);	/* interface from bbc to msh */
+ #endif	/* NNTP */
+ 
+     if ((input = fdopen (in, "r")) == NULL
+@@ -404,7 +404,7 @@
+ 
+     if (result == NOTOK)
+ 	return NOTOK;
+-    strcpy (buffer, response);
++    strncpy (buffer, response, BUFSIZ);
+ 
+     for (;;)
+ 	switch (multiline ()) {
+@@ -412,7 +412,7 @@
+ 		return NOTOK;
+ 
+ 	    case DONE: 
+-		strcpy (response, buffer);
++		strncpy (response, buffer, BUFSIZ);
+ 		return OK;
+ 
+ 	    case OK: 
+@@ -478,12 +478,12 @@
+     va_start(ap, fmt);
+ #ifndef NNTP
+     /* needs to be fixed... va_end needs to be added */
+-    sprintf (buffer, "XTND %s", fmt);
++    snprintf (buffer, BUFSIZ, "XTND %s", fmt);
+     result = traverse (action, buffer, a, b, c, d);
+     va_end(ap);
+     return result;
+ #else /* NNTP */
+-    sprintf (buffer, fmt, a, b, c, d);
++    snprintf (buffer, BUFSIZ,  fmt, a, b, c, d);
+     ap = brkstring (buffer, " ", "\n");	/* a hack, i know... */
+ 
+     if (!strcasecmp(ap[0], "x-bboards")) {	/* XTND "X-BBOARDS group */
+@@ -502,11 +502,11 @@
+     if (!strcasecmp (ap[0], "bboards")) {
+ 
+ 	if (ap[1]) {			/* XTND "BBOARDS group" */
+-	    sprintf (xtnd_name, "%s", ap[1]);		/* save the name */
++	    snprintf (xtnd_name, 512, "%s", ap[1]);		/* save the name */
+ 	    if (command("GROUP %s", xtnd_name) == NOTOK)
+ 		return NOTOK;
+ 
+-	    strcpy (buffer, response);	/* action must ignore extra args */
++	    strncpy (buffer, response, BUFSIZ);	/* action must ignore extra args */
+ 	    ap = brkstring (response, " ", "\n");/* "211 nart first last g" */
+ 	    xtnd_first = atoi (ap[2]);
+ 	    xtnd_last  = atoi (ap[3]);
+@@ -568,7 +568,7 @@
+ {
+     char *cp, buffer[BUFSIZ];
+ 
+-    vsprintf (buffer, fmt, ap);
++    vsnprintf (buffer, BUFSIZ,  fmt, ap);
+     if (poprint)
+ 	if (pophack) {
+ 	    if ((cp = strchr (buffer, ' ')))
+@@ -625,10 +625,10 @@
+ 	if (buffer[TRMLEN] == 0)
+ 	    return DONE;
+ 	else
+-	    strcpy (response, buffer + TRMLEN);
++	    strncpy (response, buffer + TRMLEN, BUFSIZ);
+     }
+     else
+-	strcpy (response, buffer);
++	strncpy (response, buffer, BUFSIZ);
+ 
+     return OK;
+ }
+--- nmh-0.27/uip/post.c.security	Mon May 25 02:28:20 1998
++++ nmh-0.27/uip/post.c	Sat Jul 18 14:04:49 1998
+@@ -327,7 +327,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] file", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] file", invo_name);
+ 		    print_help (buf, switches, 0);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -533,7 +533,7 @@
+ 	} else {
+ 	    strcpy (tmpfil, m_scratch ("", m_maildir (invo_name)));
+ 	    if ((out = fopen (tmpfil, "w")) == NULL) {
+-		strcpy (tmpfil, m_tmpfil (invo_name));
++		strncpy (tmpfil, m_tmpfil (invo_name), BUFSIZ);
+ 		if ((out = fopen (tmpfil, "w")) == NULL)
+ 		    adios (tmpfil, "unable to create");
+ 	    }
+@@ -728,7 +728,7 @@
+     }
+ 
+     nameoutput = linepos = 0;
+-    sprintf (namep, "%s%s", !fill_in && (hdr->flags & HMNG) ? "Original-" : "", name);
++    snprintf (namep, BUFSIZ, "%s%s", !fill_in && (hdr->flags & HMNG) ? "Original-" : "", name);
+ 
+     for (grp = 0, mp = tmpaddrs.m_next; mp; mp = np)
+ 	if (mp->m_nohost) {	/* also used to test (hdr->flags & HTRY) */
+@@ -800,15 +800,15 @@
+     mygid = getgid ();
+     time (&tclock);
+ 
+-    strcpy (from, adrsprintf (NULL, NULL));
++    strncpy (from, adrsprintf (NULL, NULL), BUFSIZ);
+ 
+-    strcpy (myhost, LocalName ());
++    strncpy (myhost, LocalName (), BUFSIZ);
+     for (cp = myhost; *cp; cp++)
+ 	*cp = uptolow (*cp);
+ 
+     if ((cp = getfullname ()) && *cp) {
+-	strcpy (sigbuf, cp);
+-	sprintf (signature, "%s <%s>", sigbuf, adrsprintf (NULL, NULL));
++	strncpy (sigbuf, cp, BUFSIZ);
++	snprintf (signature, BUFSIZ, "%s <%s>", sigbuf, adrsprintf (NULL, NULL));
+ 	if ((cp = getname (signature)) == NULL)
+ 	    adios (NULL, "getname () failed -- you lose extraordinarily big");
+ 	if ((mp = getm (cp, NULL, 0, AD_HOST, NULL)) == NULL)
+@@ -817,7 +817,7 @@
+ 	while (getname (""))
+ 	    continue;
+     } else {
+-	strcpy (signature, adrsprintf (NULL, NULL));
++	strncpy (signature, adrsprintf (NULL, NULL), BUFSIZ);
+     }
+ }
+ 
+@@ -923,7 +923,7 @@
+ 	mp->m_pers = getcpy (aka);
+     if (format) {
+ 	if (mp->m_gname && !fill_in)
+-	    sprintf (cp = buffer, "%s;", mp->m_gname);
++	    snprintf (cp = buffer, BUFSIZ,"%s;", mp->m_gname);
+ 	else
+ 	    cp = adrformat (mp);
+     }
+@@ -1065,7 +1065,7 @@
+     int i;
+     char buffer[BUFSIZ];
+ 
+-    sprintf (buffer, "%s\n", adrformat (mp));
++    snprintf (buffer, BUFSIZ, "%s\n", adrformat (mp));
+     i = strlen (buffer);
+ 
+     return (write (pfd, buffer, i) == i ? OK : NOTOK);
+@@ -1103,7 +1103,7 @@
+     char *vec[6];
+     FILE *out;
+ 
+-    strcpy (bccfil, m_tmpfil ("bccs"));
++    strncpy (bccfil, m_tmpfil ("bccs"), BUFSIZ);
+     if ((out = fopen (bccfil, "w")) == NULL)
+ 	adios (bccfil, "unable to create");
+     chmod (bccfil, 0600);
+@@ -1423,19 +1423,19 @@
+ 	case LOCALHOST: 
+ 	    mbox = lp->m_mbox;
+ 	    host = lp->m_host;
+-	    strcpy (addr, mbox);
++	    strncpy (addr, mbox, BUFSIZ);
+ 	    break;
+ 
+ 	case UUCPHOST: 
+ 	    mbox = auxformat (lp, 0);
+ 	    host = NULL;
+-	    sprintf (addr, "%s!%s", lp->m_host, lp->m_mbox);
++	    snprintf (addr, BUFSIZ, "%s!%s", lp->m_host, lp->m_mbox);
+ 	    break;
+ 
+ 	default: 		/* let SendMail decide if the host is bad  */
+ 	    mbox = lp->m_mbox;
+ 	    host = lp->m_host;
+-	    sprintf (addr, "%s at %s", mbox, host);
++	    snprintf (addr, BUFSIZ, "%s at %s", mbox, host);
+ 	    break;
+     }
+ 
+@@ -1634,7 +1634,7 @@
+ 	case LOCALHOST: 
+ 	    mbox = lp->m_mbox;
+ 	    host = LocalName ();
+-	    strcpy (addr, mbox);
++	    strncpy (addr, mbox, BUFSIZ);
+ 	    break;
+ 
+ 	case UUCPHOST: 
+@@ -1647,7 +1647,7 @@
+ 	default: 		/* let MMDF decide if the host is bad */
+ 	    mbox = lp->m_mbox;
+ 	    host = lp->m_host;
+-	    sprintf (addr, "%s at %s", mbox, host);
++	    snprintf (addr, BUFSIZ, "%s at %s", mbox, host);
+ 	    break;
+     }
+ 
+@@ -1881,7 +1881,7 @@
+ 
+ 	case OK: 
+ 	    /* see if we need to add `+' */
+-	    sprintf (fold, "%s%s",
++	    snprintf (fold, BUFSIZ,  "%s%s",
+ 		    *folder == '+' || *folder == '@' ? "" : "+", folder);
+ 
+ 	    /* now exec the fileproc */
+@@ -1947,7 +1947,7 @@
+     char buffer[BUFSIZ];
+     va_list ap;
+ 
+-    sprintf (buffer, "[%s]", rp_valstr (code));
++    snprintf (buffer, BUFSIZ, "[%s]", rp_valstr (code));
+ 
+     va_start(ap, fmt);
+     advertise (buffer, NULL, fmt, ap);
+--- nmh-0.27/uip/prompter.c.security	Wed Jan 14 21:15:07 1998
++++ nmh-0.27/uip/prompter.c	Sat Jul 18 16:34:02 1998
+@@ -110,13 +110,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++))
+@@ -129,7 +129,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buffer, "%s [switches] file", invo_name);
++		    snprintf (buffer, BUFSIZ, "%s [switches] file", invo_name);
+ 		    print_help (buffer, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -183,7 +183,7 @@
+     if ((in = fopen (drft, "r")) == NULL)
+ 	adios (drft, "unable to open");
+ 
+-    strcpy (tmpfil, m_tmpfil (invo_name));
++    strncpy (tmpfil, m_tmpfil (invo_name), BUFSIZ);
+     if ((out = fopen (tmpfil, "w")) == NULL)
+ 	adios (tmpfil, "unable to create");
+     chmod (tmpfil, 0600);
+--- nmh-0.27/uip/rcvdist.c.security	Thu Jan 22 17:45:45 1998
++++ nmh-0.27/uip/rcvdist.c	Sat Jul 18 16:34:09 1998
+@@ -36,7 +36,7 @@
+ {
+     pid_t child_id;
+     int i, vecp = 1;
+-    char *addrs = NULL, *cp, *form = NULL, buf[100];
++    char *addrs = NULL, *cp, *form = NULL, buf[BUFSIZ];
+     char **ap, **argp, *arguments[MAXARGS], *vec[MAXARGS];
+     register FILE *fp;
+ 
+@@ -45,13 +45,13 @@
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+     mts_init (invo_name);
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -61,11 +61,12 @@
+ 		    ambigsw (cp, switches);
+ 		    done (1);
+ 		case UNKWNSW: 
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] [switches for postproc] address ...",
++		    snprintf (buf, BUFSIZ, "%s [switches] [switches for postproc] address ...",
+ 			    invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+@@ -87,12 +88,12 @@
+ 	    invo_name);
+ 
+     umask (~m_gmprot ());
+-    strcpy (tmpfil, m_tmpfil (invo_name));
++    strncpy (tmpfil, m_tmpfil (invo_name), BUFSIZ);
+     if ((fp = fopen (tmpfil, "w+")) == NULL)
+ 	adios (tmpfil, "unable to create");
+     cpydata (fileno (stdin), fileno (fp), "message", tmpfil);
+     fseek (fp, 0L, SEEK_SET);
+-    strcpy (drft, m_tmpfil (invo_name));
++    strncpy (drft, m_tmpfil (invo_name), BUFSIZ);
+     rcvdistout (fp, form, addrs);
+     fclose (fp);
+ 
+--- nmh-0.27/uip/rcvpack.c.security	Wed Jan 14 21:15:42 1998
++++ nmh-0.27/uip/rcvpack.c	Sat Jul 18 16:34:16 1998
+@@ -33,7 +33,7 @@
+ main (int argc, char **argv)
+ {
+     int md;
+-    char *cp, *file = NULL, buf[100];
++    char *cp, *file = NULL, buf[BUFSIZ];
+     char **ap, **argp;
+     char *arguments[MAXARGS];
+ 
+@@ -42,13 +42,13 @@
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+     mts_init (invo_name);
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -61,7 +61,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] file", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] file", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+--- nmh-0.27/uip/rcvstore.c.security	Wed Jan 14 21:15:57 1998
++++ nmh-0.27/uip/rcvstore.c	Sat Jul 18 16:34:31 1998
+@@ -51,7 +51,7 @@
+     int publicsw = -1, zerosw = 0;
+     int create = 1, unseensw = 1;
+     int fd, msgnum, seqp = 0;
+-    char *cp, *maildir, *folder = NULL, buf[100];
++    char *cp, *maildir, *folder = NULL, buf[BUFSIZ];
+     char **ap, **argp, *arguments[MAXARGS], *seqs[NUMATTRS+1];
+     struct msgs *mp;
+     struct stat st;
+@@ -61,13 +61,13 @@
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+     mts_init (invo_name);
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -80,7 +80,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ,"%s [+folder] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -138,7 +138,7 @@
+ 
+     seqs[seqp] = NULL;	/* NULL terminate list of sequences */
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+ 
+     /* if no folder is given, use default folder */
+--- nmh-0.27/uip/rcvtty.c.security	Sat May 16 17:32:08 1998
++++ nmh-0.27/uip/rcvtty.c	Sat Jul 18 16:34:40 1998
+@@ -77,7 +77,7 @@
+ main (int argc, char **argv)
+ {
+     int md, vecp = 0;
+-    char *cp, *user, buf[100], **ap;
++    char *cp, *user, buf[BUFSIZ], **ap;
+     char **argp, *arguments[MAXARGS], *vec[MAXARGS];
+     char tty[BUFSIZ];
+     struct utmp ut;
+@@ -88,13 +88,13 @@
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+     mts_init (invo_name);
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, BUFSIZ);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -104,11 +104,12 @@
+ 		    ambigsw (cp, switches);
+ 		    done (1);
+ 		case UNKWNSW: 
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [command ...]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [command ...]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -150,7 +151,8 @@
+ 
+ 	    }
+ 	}
+-	vec[vecp++] = cp;
++	if(vecp<MAXARGS)
++		vec[vecp++] = cp;
+     }
+     vec[vecp] = 0;
+ 
+@@ -251,7 +253,7 @@
+     int fd;
+     char *nfs, tmpfil[BUFSIZ];
+ 
+-    strcpy (tmpfil, m_tmpfil (invo_name));
++    strncpy (tmpfil, m_tmpfil (invo_name), BUFSIZ);
+     if ((fd = open (tmpfil, O_RDWR | O_CREAT | O_TRUNC, 0600)) == NOTOK)
+ 	return NOTOK;
+     unlink (tmpfil);
+@@ -278,7 +280,7 @@
+     char buffer[BUFSIZ], ttyspec[BUFSIZ];
+     struct stat st;
+ 
+-    sprintf (ttyspec, "/dev/%s", tty);
++    snprintf (ttyspec, BUFSIZ, "/dev/%s", tty);
+ 
+     /*
+      * The mask depends on whether we are checking for
+--- nmh-0.27/uip/refile.c.security	Wed Jan 14 21:16:26 1998
++++ nmh-0.27/uip/refile.c	Sat Jul 18 16:34:59 1998
+@@ -60,7 +60,7 @@
+     int	linkf = 0, preserve = 0, filep = 0;
+     int foldp = 0, msgp = 0, isdf = 0;
+     int i, msgnum;
+-    char *cp, *folder = NULL, buf[100];
++    char *cp, *folder = NULL, buf[BUFSIZ];
+     char **ap, **argp, *arguments[MAXARGS];
+     char *filevec[NFOLDERS + 2];
+     char **files = &filevec[1];	   /* leave room for remove_files:vec[0] */
+@@ -72,13 +72,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -91,7 +91,7 @@
+ 		    adios (NULL, "-%s unknown\n", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [msgs] [switches] +folder ...", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [msgs] [switches] +folder ...", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -149,11 +149,12 @@
+ 	    folders[foldp++].f_name =
+ 		    path (cp + 1, *cp == '+' ? TFOLDER : TSUBCWF);
+ 	} else {
+-	    msgs[msgp++] = cp;
++	    if(msgp<MAXARGS-1)
++	    	msgs[msgp++] = cp;
+ 	}
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (foldp == 0)
+ 	adios (NULL, "no folder specified");
+@@ -183,7 +184,7 @@
+ 	msgs[msgp++] = "cur";
+     if (!folder)
+ 	folder = getfolder (1);
+-    strcpy (maildir, m_maildir (folder));
++    strncpy (maildir, m_maildir (folder), BUFSIZ);
+ 
+     if (chdir (maildir) == NOTOK)
+ 	adios (maildir, "unable to change directory to");
+@@ -260,7 +261,7 @@
+ 
+     for (fp = folders, ep = folders + nfolders; fp < ep; fp++) {
+ 	chdir (m_maildir (""));
+-	strcpy (nmaildir, m_maildir (fp->f_name));
++	strncpy (nmaildir, m_maildir (fp->f_name), BUFSIZ);
+ 
+ 	if (stat (nmaildir, &st) == NOTOK) {
+ 	    if (errno != ENOENT)
+--- nmh-0.27/uip/repl.c.security	Wed Jul  1 00:15:56 1998
++++ nmh-0.27/uip/repl.c	Sat Jul 18 16:35:15 1998
+@@ -136,7 +136,7 @@
+     int nedit = 0, nwhat = 0;
+     char *cp, *cwd, *dp, *maildir, *file = NULL;
+     char *folder = NULL, *msg = NULL, *dfolder = NULL;
+-    char *dmsg = NULL, *ed = NULL, drft[BUFSIZ], buf[100];
++    char *dmsg = NULL, *ed = NULL, drft[BUFSIZ], buf[BUFSIZ];
+     char **ap, **argp, *arguments[MAXARGS];
+     struct msgs *mp = NULL;
+     struct stat st;
+@@ -150,13 +150,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -169,7 +169,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s: [+folder] [msg] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s: [+folder] [msg] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (0);
+ 		case VERSIONSW:
+@@ -326,7 +326,7 @@
+ 
+     cwd = getcpy (pwd ());
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (file && (msg || folder))
+ 	adios (NULL, "can't mix files and folders/msgs");
+@@ -340,7 +340,7 @@
+     /* Check if a draft exists */
+     if (!buildsw && stat (drft, &st) != NOTOK) {
+ #else
+-    strcpy (drft, m_draft (dfolder, dmsg, NOUSE, &isdf));
++    strncpy (drft, m_draft (dfolder, dmsg, NOUSE, &isdf), BUFSIZ);
+ 
+     /* Check if a draft exists */
+     if (stat (drft, &st) != NOTOK) {
+--- nmh-0.27/uip/replsbr.c.security	Wed Feb 25 17:36:41 1998
++++ nmh-0.27/uip/replsbr.c	Sat Jul 18 14:04:49 1998
+@@ -338,7 +338,7 @@
+     /* concatenate all the new addresses onto 'buf' */
+     for (isgroup = 0; cp = getname (str); ) {
+ 	if ((mp = getm (cp, dfhost, dftype, AD_NAME, error)) == NULL) {
+-	    sprintf (baddr, "\t%s -- %s\n", cp, error);
++	    snprintf (baddr, BUFSIZ, "\t%s -- %s\n", cp, error);
+ 	    badaddrs = add (baddr, badaddrs);
+ 	    continue;
+ 	}
+@@ -390,7 +390,7 @@
+ 	return 0;
+ 
+     if (querysw) {
+-	sprintf (buffer, "Reply to %s? ", adrformat (np));
++	snprintf (buffer, BUFSIZ, "Reply to %s? ", adrformat (np));
+ 	if (!gans (buffer, anoyes))
+ 	return 0;
+     }
+--- nmh-0.27/uip/rmf.c.security	Fri May  8 15:50:27 1998
++++ nmh-0.27/uip/rmf.c	Sat Jul 18 16:35:35 1998
+@@ -31,19 +31,19 @@
+ {
+     int defolder = 0, interactive = -1;
+     char *cp, *folder = NULL, newfolder[BUFSIZ];
+-    char buf[100], **ap, **argp, *arguments[MAXARGS];
++    char buf[BUFSIZ], **ap, **argp, *arguments[MAXARGS];
+ 
+ #ifdef LOCALE
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n(argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -56,7 +56,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ,  "%s [+folder] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -81,7 +81,7 @@
+ 	}
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (!folder) {
+ 	folder = getfolder (1);
+@@ -99,9 +99,9 @@
+ 	if (cp > newfolder)
+ 	    *cp = '\0';
+ 	else
+-	    strcpy (newfolder, getfolder(0));
++	    strncpy (newfolder, getfolder(0), BUFSIZ);
+     } else {
+-	strcpy (newfolder, getfolder(0));
++	strncpy (newfolder, getfolder(0), BUFSIZ);
+     }
+ 
+     if (interactive) {
+@@ -134,7 +134,7 @@
+ 		break;		/* fall otherwise */
+ 
+ 	case NOTOK: 
+-	    sprintf (cur, "atr-%s-%s", current, m_mailpath (folder));
++	    snprintf (cur, BUFSIZ, "atr-%s-%s", current, m_mailpath (folder));
+ 	    if (!context_del (cur)) {
+ 		printf ("[+%s de-referenced]\n", folder);
+ 		return OK;
+--- nmh-0.27/uip/rmm.c.security	Mon Jun 22 16:16:45 1998
++++ nmh-0.27/uip/rmm.c	Sat Jul 18 16:35:53 1998
+@@ -21,7 +21,7 @@
+ {
+     int msgp = 0, msgnum;
+     char *cp, *maildir, *folder = NULL;
+-    char buf[100], **ap, **argp;
++    char buf[BUFSIZ], **ap, **argp;
+     char *arguments[MAXARGS], *msgs[MAXARGS];
+     struct msgs *mp;
+ 
+@@ -29,13 +29,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -48,7 +48,7 @@
+ 		    adios (NULL, "-%s unknown\n", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msgs] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -62,11 +62,12 @@
+ 	    else
+ 		folder = path (cp + 1, *cp == '+' ? TFOLDER : TSUBCWF);
+ 	} else {
+-	    msgs[msgp++] = cp;
++	    if(msgp<MAXARGS-1)
++	    	msgs[msgp++] = cp;
+ 	}
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (!msgp)
+ 	msgs[msgp++] = "cur";
+--- nmh-0.27/uip/scan.c.security	Mon Jun 22 16:17:11 1998
++++ nmh-0.27/uip/scan.c	Sat Jul 18 16:36:16 1998
+@@ -62,7 +62,7 @@
+     int i, state, msgnum;
+     int seqnum[NUMATTRS], unseen, num_unseen_seq = 0;
+     char *cp, *maildir, *file = NULL, *folder = NULL;
+-    char *form = NULL, *format = NULL, buf[100], **ap;
++    char *form = NULL, *format = NULL, buf[BUFSIZ], **ap;
+     char **argp, *nfs, *arguments[MAXARGS], *msgs[MAXARGS];
+     struct msgs *mp;
+     FILE *in;
+@@ -72,13 +72,13 @@
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+     mts_init (invo_name);
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -91,7 +91,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] [msgs] [switches]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [+folder] [msgs] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -149,11 +149,12 @@
+ 	    else
+ 		folder = path (cp + 1, *cp == '+' ? TFOLDER : TSUBCWF);
+ 	} else {
+-	    msgs[msgp++] = cp;
++	    if(msgp< MAXARGS-1)
++	    	msgs[msgp++] = cp;
+ 	}
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+ 
+     /*
+@@ -230,7 +231,7 @@
+      * Get the sequence number for each sequence
+      * specified by Unseen-Sequence
+      */
+-    if ((cp = context_find (usequence))) {
++    if ((cp = context_find (usequence)) != NULL) {
+ 	char *dp;
+ 
+ 	dp = getcpy(cp);
+--- nmh-0.27/uip/scansbr.c.security	Sun Feb  1 17:27:53 1998
++++ nmh-0.27/uip/scansbr.c	Sat Jul 18 14:04:49 1998
+@@ -73,7 +73,7 @@
+     struct comp **savecomp;
+     char *scnmsg;
+     FILE *scnout;
+-    char name[NAMESZ];
++    char name[BUFSIZ];
+     static int rlwidth, slwidth;
+ 
+ #ifdef RPATHS
+--- nmh-0.27/uip/send.c.security	Mon Jun 29 00:11:10 1998
++++ nmh-0.27/uip/send.c	Sat Jul 18 16:36:42 1998
+@@ -120,7 +120,7 @@
+     int isdf = 0, mime = 0;
+     int msgnum, status;
+     char *cp, *dfolder = NULL, *maildir = NULL;
+-    char buf[100], **ap, **argp, *arguments[MAXARGS];
++    char buf[BUFSIZ], **ap, **argp, *arguments[MAXARGS];
+     char *msgs[MAXARGS], *vec[MAXARGS];
+     struct msgs *mp;
+     struct stat st;
+@@ -132,13 +132,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     vec[vecp++] = "-library";
+@@ -154,7 +154,7 @@
+ 		    adios (NULL, "-%s unknown\n", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [file] [switches]", invo_name);
++		    snprintf (buf,BUFSIZ, "%s [file] [switches]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -162,7 +162,8 @@
+ 		    done (1);
+ 
+ 		case DRAFTSW: 
+-		    msgs[msgp++] = draft;
++		    if(msgp< MAXARGS-1)
++		    	msgs[msgp++] = draft;
+ 		    continue;
+ 
+ 		case DFOLDSW: 
+@@ -176,7 +177,8 @@
+ 		case DMSGSW: 
+ 		    if (!(cp = *argp++) || *cp == '-')
+ 			adios (NULL, "missing argument to %s", argp[-2]);
+-		    msgs[msgp++] = cp;
++		    if(msgp < MAXARGS-1)
++		    	msgs[msgp++] = cp;
+ 		    continue;
+ 		case NDFLDSW: 
+ 		    dfolder = NULL;
+@@ -211,20 +213,24 @@
+ 
+ 		case VERBSW: 
+ 		    verbsw++;
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 		case NVERBSW:
+ 		    verbsw = 0;
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 
+ 		case MIMESW:
+ 		    mime++;
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 		case NMIMESW:
+ 		    mime = 0;
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 
+ 		case DEBUGSW: 
+@@ -243,7 +249,8 @@
+ 		case SENDSW: 
+ 		case SOMLSW: 
+ 		case SNOOPSW: 
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 
+ 		case ALIASW: 
+@@ -251,24 +258,30 @@
+ 		case WIDTHSW: 
+ 		case CLIESW: 
+ 		case SERVSW: 
+-		    vec[vecp++] = --cp;
+-		    if (!(cp = *argp++) || *cp == '-')
+-			adios (NULL, "missing argument to %s", argp[-2]);
+-		    vec[vecp++] = cp;
+-		    continue;
++		    if(vecp<MAXARGS-2)
++		    {
++		    	vec[vecp++] = --cp;
++		    	if (!(cp = *argp++) || *cp == '-')
++				adios (NULL, "missing argument to %s", argp[-2]);
++		    	vec[vecp++] = cp;
++		    	continue;
++		    }
+ 	    }
+ 	} else {
+-	    msgs[msgp++] = cp;
++	    if(msgp<MAXARGS-1)
++	    	msgs[msgp++] = cp;
+ 	}
+     }
+ 
+     /*
+      * check for "Aliasfile:" profile entry
+      */
+-    if ((cp = context_find ("Aliasfile"))) {
++    if ((cp = context_find ("Aliasfile")) != NULL) {
+ 	char *dp = NULL;
+ 
+ 	for (ap = brkstring(dp = getcpy(cp), " ", "\n"); ap && *ap; ap++) {
++	    if(vecp>=MAXARGS-2)
++	    	break;
+ 	    vec[vecp++] = "-alias";
+ 	    vec[vecp++] = *ap;
+ 	}
+@@ -282,7 +295,8 @@
+ 		goto go_to_it;
+ 	    }
+ #endif /* WHATNOW */
+-	    msgs[msgp++] = getcpy (m_draft (NULL, NULL, 1, &isdf));
++	    if(msgp<MAXARGS-1)
++	    	msgs[msgp++] = getcpy (m_draft (NULL, NULL, 1, &isdf));
+ 	    if (stat (msgs[0], &st) == NOTOK)
+ 		adios (msgs[0], "unable to stat draft file");
+ 	    cp = concat ("Use \"", msgs[0], "\"? ", NULL);
+@@ -307,7 +321,7 @@
+ 		msgs[msgnum] = getcpy (m_maildir (msgs[msgnum]));
+ 	}
+     } else {
+-	if (!context_find ("path"))
++	if (context_find ("path") == NULL)
+ 	    free (path ("./", TFOLDER));
+ 
+ 	if (!msgp)
+@@ -350,7 +364,7 @@
+ 	    m_putenv ("SIGNATURE", cp);
+ #ifdef UCI
+ 	else {
+-	    sprintf (buf, "%s/.signature", mypath);
++	    snprintf (buf, BUFSIZ, "%s/.signature", mypath);
+ 	    if ((fp = fopen (buf, "r")) != NULL
+ 		&& fgets (buf, sizeof buf, fp) != NULL) {
+ 		    fclose (fp);
+@@ -376,7 +390,8 @@
+ 	    && *cp
+ 	    && (distsw = atoi (cp))
+ 	    && altmsg) {
+-	vec[vecp++] = "-dist";
++	if(vecp<MAXARGS-1)
++		vec[vecp++] = "-dist";
+ 	distfile = getcpy (m_scratch (altmsg, invo_name));
+ 	if (link (altmsg, distfile) == NOTOK) {
+ 	    if (errno != EXDEV
+--- nmh-0.27/uip/sendsbr.c.security	Mon Jun 29 01:29:07 1998
++++ nmh-0.27/uip/sendsbr.c	Sat Jul 18 14:04:49 1998
+@@ -234,7 +234,7 @@
+ 	vec[vecp++] = "-queued";
+ 
+     time (&clock);
+-    sprintf (msgid, "<%d.%ld@%s>", (int) getpid(),
++    snprintf (msgid, BUFSIZ, "<%d.%ld@%s>", (int) getpid(),
+ 		(long) clock, LocalName());
+ 
+     fseek (in, start, SEEK_SET);
+@@ -242,7 +242,7 @@
+ 	char tmpdrf[BUFSIZ];
+ 	FILE *out;
+ 
+-	strcpy (tmpdrf, m_scratch (drft, invo_name));
++	strncpy (tmpdrf, m_scratch (drft, invo_name), BUFSIZ);
+ 	if ((out = fopen (tmpdrf, "w")) == NULL)
+ 	    adios (tmpdrf, "unable to open for writing");
+ 	chmod (tmpdrf, 0600);
+@@ -348,7 +348,7 @@
+     if (annotext) {
+ 	if ((fd2 = tmp_fd ()) != NOTOK) {
+ 	    vec[vecp++] = "-idanno";
+-	    sprintf (buf, "%d", fd2);
++	    snprintf (buf, BUFSIZ, "%d", fd2);
+ 	    vec[vecp++] = buf;
+ 	} else {
+ 	    admonish (NULL, "unable to create file for annotation list");
+@@ -466,7 +466,7 @@
+ 	    dup2 (out, fileno (stdin));
+ 	    close (out);
+ 	    /* create subject for error notification */
+-	    sprintf (buf, "send failed on %s",
++	    snprintf (buf, BUFSIZ, "send failed on %s",
+ 			forwsw ? "enclosed draft" : file);
+ 
+ 	    execlp (mailproc, r1bindex (mailproc, '/'), getusername (),
+@@ -487,7 +487,7 @@
+     int fd;
+     char tmpfil[BUFSIZ];
+ 
+-    strcpy (tmpfil, m_tmpfil (invo_name));
++    strncpy (tmpfil, m_tmpfil (invo_name), BUFSIZ);
+     if ((fd = open (tmpfil, O_RDWR | O_CREAT | O_TRUNC, 0600)) == NOTOK)
+ 	return NOTOK;
+     if (debugsw)
+--- nmh-0.27/uip/show.c.security	Sun Feb  1 18:16:41 1998
++++ nmh-0.27/uip/show.c	Sat Jul 18 16:36:57 1998
+@@ -61,7 +61,7 @@
+     int nshow = 0, checkmime = 1, mime;
+     int vecp = 1, procp = 1, isdf = 0, mode = SHOW, msgnum;
+     char *cp, *maildir, *file = NULL, *folder = NULL, *proc;
+-    char buf[100], **ap, **argp, *arguments[MAXARGS];
++    char buf[BUFSIZ], **ap, **argp, *arguments[MAXARGS];
+     char *msgs[MAXARGS], *vec[MAXARGS];
+     struct msgs *mp;
+ 
+@@ -76,13 +76,13 @@
+ 	mode = PREV;
+     }
+ 
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -93,11 +93,12 @@
+ 		    done (1);
+ 		case UNKWNSW: 
+ 		case NPROGSW:
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [+folder] %s[switches] [switches for showproc]",
++		    snprintf (buf, BUFSIZ, "%s [+folder] %s[switches] [switches for showproc]",
+ 			    invo_name, mode == SHOW ? "[msgs] ": "");
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+@@ -133,19 +134,23 @@
+ 		    continue;
+ 
+ 		case FORMSW:
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    if (!(cp = *argp++) || *cp == '-')
+ 			adios (NULL, "missing argument to %s", argp[-2]);
+-		    vec[vecp++] = getcpy (etcpath(cp));
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = getcpy (etcpath(cp));
+ 		    continue;
+ 
+ 		case PROGSW:
+ 		case LENSW:
+ 		case WIDTHSW:
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = --cp;
+ 		    if (!(cp = *argp++) || *cp == '-')
+ 			adios (NULL, "missing argument to %s", argp[-2]);
+-		    vec[vecp++] = cp;
++		    if(vecp<MAXARGS-1)
++		    	vec[vecp++] = cp;
+ 		    continue;
+ 
+ 		case SHOWSW: 
+@@ -179,18 +184,20 @@
+ 	    if (mode != SHOW)
+ 		goto usage;
+ 	    else
+-		msgs[msgp++] = cp;
++		if(msgp<MAXARGS-1)
++			msgs[msgp++] = cp;
+ 	}
+     }
+     procp = vecp;
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+ 
+     if (draftsw || file) {
+ 	if (msgp)
+ 	    adios (NULL, "only one file at a time!");
+-	vec[vecp++] = draftsw
++	if(vecp<MAXARGS-1)
++		vec[vecp++] = draftsw
+ 	    ? getcpy (m_draft (folder, msgp ? msgs[0] : NULL, 1, &isdf))
+ 	    : file;
+ 	goto go_to_it;
+@@ -199,7 +206,8 @@
+ #ifdef WHATNOW
+     if (!msgp && !folder && mode == SHOW && (cp = getenv ("mhdraft")) && *cp) {
+ 	draftsw++;
+-	vec[vecp++] = cp;
++	if(vecp<MAXARGS-1)
++		vec[vecp++] = cp;
+ 	goto go_to_it;
+     }
+ #endif /* WHATNOW */
+@@ -254,7 +262,8 @@
+ 
+     for (msgnum = mp->lowsel; msgnum <= mp->hghsel; msgnum++)
+ 	if (is_selected(mp, msgnum))
+-	    vec[vecp++] = getcpy (m_name (msgnum));
++	    if(vecp<MAXARGS-1)
++	    	vec[vecp++] = getcpy (m_name (msgnum));
+ 
+     seq_setcur (mp, mp->hghsel);	/* update current message  */
+     seq_save (mp);			/* synchronize sequences   */
+@@ -308,11 +317,15 @@
+      */
+     if (strcmp (r1bindex (proc, '/'), "mhn") == 0) {
+ 	if (draftsw || file) {
+-	    vec[vecp] = vec[vecp - 1];
+-	    vec[vecp - 1] = "-file";
+-	    vecp++;
++	    if(vecp<MAXARGS-1)
++	    {
++	    	vec[vecp] = vec[vecp - 1];
++	    	vec[vecp - 1] = "-file";
++	    	vecp++;
++	    }
+ 	}
+-	vec[vecp++] = "-show";
++	if(vecp<MAXARGS-1)
++		vec[vecp++] = "-show";
+ 	vec[vecp] = NULL;
+     }
+ 
+--- nmh-0.27/uip/slocal.c.security	Fri Jun 12 17:09:12 1998
++++ nmh-0.27/uip/slocal.c	Sat Jul 18 14:04:49 1998
+@@ -171,7 +171,7 @@
+     int fd, result;
+     FILE *fp = stdin;
+     char *cp, *mdlvr = NULL;
+-    char buf[100];
++    char buf[BUFSIZ];
+     char mailbox[BUFSIZ], tmpfil[BUFSIZ];
+     char **argp = argv + 1;
+ 
+@@ -196,7 +196,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] [address info sender]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] [address info sender]", invo_name);
+ 		    print_help (buf, switches, 0);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -298,7 +298,7 @@
+     /* Record the delivery time */
+     if ((now = dlocaltimenow ()) == NULL)
+ 	adios (NULL, "unable to ascertain local time");
+-    sprintf (ddate, "Delivery-Date: %s\n", dtimenow (0));
++    snprintf (ddate, BUFSIZ, "Delivery-Date: %s\n", dtimenow (0));
+ 
+     /*
+      * Copy the message to a temporary file
+@@ -337,7 +337,7 @@
+ 	get_sender (envelope, &sender);
+ 
+     if (mbox == NULL) {
+-	sprintf (mailbox, "%s/%s",
++	snprintf (mailbox, BUFSIZ, "%s/%s",
+ 		mmdfldir[0] ? mmdfldir : pw->pw_dir,
+ 		mmdflfil[0] ? mmdflfil : pw->pw_name);
+ 	mbox = mailbox;
+@@ -539,9 +539,9 @@
+ 		    continue;	/* else fall */
+ 	    case '+':
+ 		if (*string == '+')
+-		    strcpy(tmpbuf, string);
++		    snprintf(tmpbuf, BUFSIZ, "%s", string);
+ 		else
+-		    sprintf(tmpbuf, "+%s", string);
++		    snprintf(tmpbuf, BUFSIZ, "+%s", string);
+ 		vec[2] = "rcvstore";
+ 		vec[3] = tmpbuf;
+ 		vec[4] = NULL;
+@@ -1068,7 +1068,7 @@
+     }
+ 
+     i = strlen ("From ");
+-    strcpy (buffer, envelope + i);
++    snprintf(buffer, BUFSIZ, "%s", envelope + i);
+     if ((cp = strchr(buffer, '\n'))) {
+ 	*cp = 0;
+ 	cp -= 24;
+@@ -1101,7 +1101,7 @@
+     char buffer[BUFSIZ];
+     FILE *qfp, *ffp;
+ 
+-    strcpy (tmpfil, m_tmpfil (invo_name));
++    snprintf(tmpfil, BUFSIZ, "%s", m_tmpfil (invo_name));
+ 
+     /* open temporary file to put message in */
+     if ((fd1 = open (tmpfil, O_RDWR | O_CREAT | O_TRUNC, 0600)) == -1)
+@@ -1186,10 +1186,10 @@
+ 		if (hp) {
+ 		    /* return path for UUCP style addressing */
+ 		    ep = strchr(++hp, '\n');
+-		    sprintf (buffer, "Return-Path: %.*s!%.*s\n", ep - hp, hp, cp - fp, fp);
++		    snprintf (buffer, BUFSIZ, "Return-Path: %.*s!%.*s\n", ep - hp, hp, cp - fp, fp);
+ 		} else {
+ 		    /* return path for standard domain addressing */
+-		    sprintf (buffer, "Return-Path: %.*s\n", cp - fp, fp);
++		    snprintf (buffer, BUFSIZ, "Return-Path: %.*s\n", cp - fp, fp);
+ 		}
+ 
+ 		/* Add Return-Path header to message */
+@@ -1243,7 +1243,7 @@
+ 	return NULL;
+ 
+     /* copy string into temp buffer */
+-    strcpy (buffer, cp);
++    strncpy (buffer, cp, sizeof(buffer));
+     bp = buffer;
+ 
+     /* skip over leading whitespace */
+--- nmh-0.27/uip/sortm.c.security	Thu Jan 22 17:47:15 1998
++++ nmh-0.27/uip/sortm.c	Sat Jul 18 16:37:13 1998
+@@ -66,7 +66,7 @@
+ {
+     int	msgp = 0, i, msgnum;
+     char *cp, *maildir, *datesw = NULL;
+-    char *folder = NULL, buf[100], **ap, **argp;
++    char *folder = NULL, buf[BUFSIZ], **ap, **argp;
+     char *arguments[MAXARGS], *msgs[MAXARGS];
+     struct msgs *mp;
+     struct smsg **dlist;
+@@ -75,13 +75,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -94,7 +94,7 @@
+ 		adios (NULL, "-%s unknown", cp);
+ 
+ 	    case HELPSW:
+-		sprintf(buf, "%s [+folder] [msgs] [switches]", invo_name);
++		snprintf(buf, BUFSIZ, "%s [+folder] [msgs] [switches]", invo_name);
+ 		print_help (buf, switches, 1);
+ 		done (1);
+ 	    case VERSIONSW:
+@@ -154,11 +154,12 @@
+ 	    else
+ 		folder = path (cp + 1, *cp == '+' ? TFOLDER : TSUBCWF);
+ 	} else {
+-	    msgs[msgp++] = cp;
++	    if(msgp<MAXARGS-1)
++	    	msgs[msgp++] = cp;
+ 	}
+     }
+ 
+-    if (!context_find ("path"))
++    if (context_find ("path") == NULL)
+ 	free (path ("./", TFOLDER));
+     if (!msgp)
+ 	msgs[msgp++] = "all";
+@@ -483,7 +484,7 @@
+ 	mlist[msg] = (struct smsg *)0;
+ 	old = smsgs[nxt].s_msg;
+ 	new = smsgs[msg].s_msg;
+-	strcpy (oldname, m_name (old));
++	strncpy (oldname, m_name (old), BUFSIZ);
+ 	newname = m_name (new);
+ 	if (verbose)
+ 	    printf ("message %d becomes message %d\n", old, new);
+@@ -512,7 +513,7 @@
+     char f1[BUFSIZ], tmpfil[BUFSIZ];
+     struct smsg *sp;
+ 
+-    strcpy (tmpfil, m_name (mp->hghmsg + 1));
++    strncpy (tmpfil, m_name (mp->hghmsg + 1), BUFSIZ);
+ 
+     for (i = 0; i < nmsgs; i++) {
+ 	if (! (sp = mlist[i])) 
+@@ -529,7 +530,7 @@
+ 	 */
+ 	old = smsgs[j].s_msg;
+ 	new = smsgs[i].s_msg;
+-	strcpy (f1, m_name (old));
++	strncpy (f1, m_name (old), BUFSIZ);
+ 
+ 	if (verbose)
+ 	    printf ("renaming message chain from %d to %d\n", old, new);
+--- nmh-0.27/uip/spop.c.security	Sun Nov 30 04:41:10 1997
++++ nmh-0.27/uip/spop.c	Sat Jul 18 14:04:49 1998
+@@ -333,7 +333,7 @@
+     }
+ 
+     va_start(ap, fmt);
+-    vsprintf (buffer, fmt, ap);
++    vsnprintf (buffer, BUFSIZ-1 /* for the \n */, fmt, ap);
+     va_end(ap);
+ 
+     bp = buffer;
+@@ -375,14 +375,14 @@
+     if (rp_isbad (sm_waend ()))
+ 	goto sm_err;
+ 
+-    sprintf (buffer,
++    snprintf (buffer, BUFSIZ,
+ 	    "Date: %s\nFrom: %s\nTo: %s\nSubject: BBoards Failure\n\n",
+ 	    dtimenow (0), bb_from, bb_from);
+     if (rp_isbad (sm_wtxt (buffer, strlen (buffer))))
+ 	goto sm_err;
+ 
+     for (i = 0; bb[i]; i++) {
+-	sprintf (buffer, "BBoard %s\n", bb[i]->bb_name);
++	snprintf (buffer, BUFSIZ, "BBoard %s\n", bb[i]->bb_name);
+ 	if (rp_isbad (sm_wtxt (buffer, strlen (buffer))))
+ 	    goto sm_err;
+     }
+@@ -512,8 +512,8 @@
+     bb_uid = pw->pw_uid;
+     bb_gid = pw->pw_gid;
+ #ifndef	SPOP
+-    strcpy (bb_from, adrsprintf (pw->pw_name, LocalName ()));
+-    strcpy (bb_home, pw->pw_dir);
++    strcpy (bb_from, adrsprintf (pw->pw_name, LocalName ()), BUFSIZ);
++    strcpy (bb_home, pw->pw_dir, BUFSIZ);
+ #endif	not SPOP
+ 
+     if (*vec == NULL)
+--- nmh-0.27/uip/spost.c.security	Sat May 16 17:38:10 1998
++++ nmh-0.27/uip/spost.c	Sat Jul 18 14:22:59 1998
+@@ -210,8 +210,8 @@
+     invo_name = r1bindex (argv[0], '/');
+     mts_init (invo_name);
+     if ((cp = context_find (invo_name)) != NULL) {
+-	argp = copyip (brkstring (cp, " ", "\n"), arguments);
+-	copyip (argv+1, argp);
++	argp = copyip_n (brkstring (cp, " ", "\n"), arguments, MAXARGS);
++	copyip_n (argv+1, argp, MAXARGS);
+ 	argp = arguments;
+     }
+ 
+@@ -391,7 +391,7 @@
+ 
+     fclose (in);
+     if (backflg && !whomflg) {
+-	strcpy (buf, m_backup (msg));
++	strncpy (buf, m_backup (msg), BUFSIZ);
+ 	if (rename (msg, buf) == NOTOK)
+ 	    advise (buf, "unable to rename %s to", msg);
+     }
+@@ -528,14 +528,14 @@
+     char *cp;
+     char sigbuf[BUFSIZ];
+ 
+-    strcpy( from, getusername() );
++    strncpy( from, getusername(), BUFSIZ);
+ 
+     if ((cp = getfullname ()) && *cp) {
+-	strcpy (sigbuf, cp);
+-	sprintf (signature, "%s <%s>", sigbuf,  from);
++	strncpy (sigbuf, cp, BUFSIZ);
++	snprintf (signature, BUFSIZ, "%s <%s>", sigbuf,  from);
+     }
+     else
+-	sprintf (signature, "%s",  from);
++	snprintf (signature, BUFSIZ, "%s",  from);
+ }
+ 
+ 
+--- nmh-0.27/uip/vmh.c.security	Mon Jun 22 16:20:28 1998
++++ nmh-0.27/uip/vmh.c	Sat Jul 18 16:37:34 1998
+@@ -224,13 +224,13 @@
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++))
+@@ -244,7 +244,7 @@
+ 		    continue;
+ 
+ 		case HELPSW: 
+-		    sprintf (buffer, "%s [switches for vmhproc]", invo_name);
++		    snprintf (buffer,  BUFSIZ, "%s [switches for vmhproc]", invo_name);
+ 		    print_help (buffer, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -265,7 +265,8 @@
+ 		    continue;
+ 	    }
+ 	else
+-	    vec[vecp++] = cp;
++	    if(vecp< MAXARGS-1)
++	    	vec[vecp++] = cp;
+ 
+     if (TTYinit (nprog) == NOTOK || WINinit (nprog) == NOTOK) {
+ 	vec[vecp] = NULL;
+@@ -340,10 +341,10 @@
+ 	    close (pfd1[1]);
+ 
+ 	    vec[vecp++] = "-vmhread";
+-	    sprintf (buf1, "%d", pfd1[0]);
++	    snprintf (buf1, BUFSIZ, "%d", pfd1[0]);
+ 	    vec[vecp++] = buf1;
+ 	    vec[vecp++] = "-vmhwrite";
+-	    sprintf (buf2, "%d", pfd0[1]);
++	    snprintf (buf2, BUFSIZ, "%d", pfd0[1]);
+ 	    vec[vecp++] = buf2;
+ 	    vec[vecp] = NULL;
+ 
+@@ -373,14 +374,16 @@
+     struct record rcs;
+     register struct record *rc = &rcs;
+     register WINDOW **w;
++    int len;
+ 
+     initrc (rc);
+ 
+     bp = buffer;
+-    sprintf (bp, "%d %d", RC_VRSN, numwins);
++    len = BUFSIZ;
++    len -= snprintf (bp, len, "%d %d", RC_VRSN, numwins);
+     bp += strlen (bp);
+     for (w = windows; *w; w++) {
+-	sprintf (bp, " %d", (*w)->_maxy);
++	len -= snprintf (bp, len, " %d", (*w)->_maxy);
+ 	bp += strlen (bp);
+     }
+ 
+@@ -796,7 +799,8 @@
+ 		}
+ 		
+ 		if (c >= ' ' && c < '\177')
+-		    waddch (w, *bp++ = c);
++		    if(bp-buffer < BUFSIZ-1)
++		    	waddch (w, *bp++ = c);
+ 		break;
+ 	}
+ 
+@@ -1471,7 +1475,7 @@
+ 	iov++;
+     }
+     
+-    vsprintf (buffer, fmt, ap);
++    vsnprintf (buffer, BUFSIZ,  fmt, ap);
+     iov->iov_len = strlen (iov->iov_base = buffer);
+     iov++;
+     if (what) {
+@@ -1484,7 +1488,7 @@
+ 	    iov++;
+ 	}
+ 	if (!(iov->iov_base = strerror (eindex))) {
+-	    sprintf (err, "Error %d", eindex);
++	    snprintf (err, BUFSIZ, "Error %d", eindex);
+ 	    iov->iov_base = err;
+ 	}
+ 	iov->iov_len = strlen (iov->iov_base);
+--- nmh-0.27/uip/vmhsbr.c.security	Wed Dec 17 03:27:26 1997
++++ nmh-0.27/uip/vmhsbr.c	Sat Jul 18 14:04:49 1998
+@@ -41,7 +41,7 @@
+     PEERwfd = wfd;
+ 
+     if ((cp = getenv ("MHVDEBUG")) && *cp) {
+-	sprintf (buffer, "%s.out", invo_name);
++	snprintf (buffer, BUFSIZ, "%s.out", invo_name);
+ 	if ((fp = fopen (buffer, "w"))) {
+ 	  fseek (fp, 0L, SEEK_END);
+ 	  fprintf (fp, "%d: rcinit (%d, %d)\n", (int) getpid(), rfd, wfd);
+@@ -179,18 +179,18 @@
+     int eindex = errno;
+     register char *bp, *s;
+     char buffer[BUFSIZ * 2];
+-
+-    vsprintf (buffer, fmt, ap);
++    int len=BUFSIZ*2;
++    len-=vsnprintf (buffer, len, fmt, ap);
+     bp = buffer + strlen (buffer);
+     if (what) {
+ 	if (*what) {
+-	    sprintf (bp, " %s: ", what);
++	    len-=snprintf (bp, len, " %s: ", what);
+ 	    bp += strlen (bp);
+ 	}
+ 	if ((s = strerror (eindex)))
+-	    strcpy (bp, s);
++	    len-=snprintf(bp, len, "%s",s);
+ 	else
+-	    sprintf (bp, "unknown error %d", eindex);
++	    len-=snprintf (bp, len, "unknown error %d", eindex);
+ 	bp += strlen (bp);
+     }
+ 
+@@ -205,7 +205,7 @@
+     static char buffer[BUFSIZ * 2];
+ 
+     va_start(ap, fmt);
+-    vsprintf (buffer, fmt, ap);
++    vsnprintf (buffer, BUFSIZ*2, fmt, ap);
+     va_end(ap);
+ 
+     rc->rc_len = strlen (rc->rc_data = getcpy (buffer));
+--- nmh-0.27/uip/vmhtest.c.security	Wed Jan 14 21:19:58 1998
++++ nmh-0.27/uip/vmhtest.c	Sat Jul 18 14:04:49 1998
+@@ -58,7 +58,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buffer, "%s [switches]", invo_name);
++		    snprintf (buffer, BUFSIZ, "%s [switches]", invo_name);
+ 		    print_help (buffer, switches, 0);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -241,7 +241,7 @@
+ 
+     initrc (rc);
+ 
+-    sprintf (buffer, "%d", selwin ());
++    snprintf (buffer, BUFSIZ,  "%d", selwin ());
+     switch (str2rc (RC_WIN, buffer, rc)) {
+ 	case RC_ACK: 
+ 	    break;
+--- nmh-0.27/uip/whatnowproc.c.security	Thu Jul  2 18:21:58 1998
++++ nmh-0.27/uip/whatnowproc.c	Sat Jul 18 16:40:19 1998
+@@ -24,7 +24,8 @@
+     int found, k, msgnum, vecp;
+     register char *bp;
+     char buffer[BUFSIZ], *vec[MAXARGS];
+-
++    int len;
++    
+     vecp = 0;
+     vec[vecp++] = r1bindex (whatnowproc, '/');
+     vec[vecp] = NULL;
+@@ -38,7 +39,7 @@
+ 	if (mp == NULL || *altmsg == '/' || cwd == NULL)
+ 	    m_putenv ("mhaltmsg", altmsg);
+ 	else {
+-	    sprintf (buffer, "%s/%s", mp->foldpath, altmsg);
++	    snprintf (buffer, BUFSIZ, "%s/%s", mp->foldpath, altmsg);
+ 	    m_putenv ("mhaltmsg", buffer);
+ 	}
+     } else {
+@@ -46,7 +47,7 @@
+     }
+     if ((bp = getenv ("mhaltmsg")))/* XXX */
+ 	m_putenv ("editalt", bp);
+-    sprintf (buffer, "%d", dist);
++    snprintf (buffer, BUFSIZ, "%d", dist);
+     m_putenv ("mhdist", buffer);
+     if (nedit) {
+ 	unputenv ("mheditor");
+@@ -54,7 +55,7 @@
+ 	m_putenv ("mheditor", ed ? ed : (ed = context_find ("editor"))
+ 	    ? ed : defaulteditor);
+     }
+-    sprintf (buffer, "%d", use);
++    snprintf (buffer, BUFSIZ, "%d", use);
+     m_putenv ("mhuse", buffer);
+ 
+     unputenv ("mhmessages");
+@@ -63,14 +64,15 @@
+     if (text && mp && !is_readonly(mp)) {
+ 	found = 0;
+ 	bp = buffer;
++	len = BUFSIZ;
+ 	for (msgnum = mp->lowmsg; msgnum <= mp->hghmsg; msgnum++) {
+ 	    if (is_selected(mp, msgnum)) {
+-		sprintf (bp, "%s%s", found ? " " : "", m_name (msgnum));
++		len-=snprintf (bp, len, "%s%s", found ? " " : "", m_name (msgnum));
+ 		bp += strlen (bp);
+ 		for (k = msgnum + 1; k <= mp->hghmsg && is_selected(mp, k); k++)
+ 		    continue;
+ 		if (--k > msgnum) {
+-		    sprintf (bp, "-%s", m_name (k));
++		    len-=snprintf (bp, len, "-%s", m_name (k));
+ 		    bp += strlen (bp);
+ 		}
+ 		msgnum = k + 1;
+@@ -80,7 +82,7 @@
+ 	if (found) {
+ 	    m_putenv ("mhmessages", buffer);
+ 	    m_putenv ("mhannotate", text);
+-	    sprintf (buffer, "%d", inplace);
++	    snprintf (buffer, BUFSIZ, "%d", inplace);
+ 	    m_putenv ("mhinplace", buffer);
+ 	}
+     }
+--- nmh-0.27/uip/whatnowsbr.c.security	Fri Jul  3 17:19:21 1998
++++ nmh-0.27/uip/whatnowsbr.c	Sat Jul 18 16:38:14 1998
+@@ -82,18 +82,18 @@
+     int isdf = 0, nedit = 0, use = 0;
+     char *cp, *dfolder = NULL, *dmsg = NULL;
+     char *ed = NULL, *drft = NULL, *msgnam = NULL;
+-    char buf[100], prompt[BUFSIZ];
++    char buf[BUFSIZ], prompt[BUFSIZ];
+     char **ap, **argp, *arguments[MAXARGS];
+     struct stat st;
+ 
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -106,7 +106,7 @@
+ 		adios (NULL, "-%s unknown", cp);
+ 
+ 	    case HELPSW: 
+-		sprintf (buf, "%s [switches] [file]", invo_name);
++		snprintf (buf, BUFSIZ, "%s [switches] [file]", invo_name);
+ 		print_help (buf, whatnowswitches, 1);
+ 		done (1);
+ 	    case VERSIONSW:
+@@ -170,7 +170,7 @@
+     if (!nedit && editfile (&ed, NULL, drft, use, NULL, msgnam, NULL, 1) < 0)
+ 	done (1);
+ 
+-    sprintf (prompt, myprompt, invo_name);
++    snprintf (prompt, BUFSIZ, myprompt, invo_name);
+     for (;;) {
+ 	if (!(argp = getans (prompt, aleqs))) {
+ 	    unlink (LINK);
+@@ -294,13 +294,13 @@
+ 
+     if (altmsg) {
+ 	if (mp == NULL || *altmsg == '/' || cwd == NULL)
+-	    strcpy (altpath, altmsg);
++	    snprintf(altpath, BUFSIZ, "%s", altmsg);
+ 	else
+-	    sprintf (altpath, "%s/%s", mp->foldpath, altmsg);
++	    snprintf (altpath, BUFSIZ, "%s/%s", mp->foldpath, altmsg);
+ 	if (cwd == NULL)
+-	    strcpy (linkpath, LINK);
++	    snprintf(linkpath, BUFSIZ, "%s", LINK);
+ 	else
+-	    sprintf (linkpath, "%s/%s", cwd, LINK);
++	    snprintf (linkpath, BUFSIZ,  "%s/%s", cwd, LINK);
+     }
+ 
+     if (altmsg) {
+@@ -702,7 +702,7 @@
+ sendit (char *sp, char **arg, char *file, int pushed)
+ {
+     int	vecp = 1;
+-    char *cp, buf[100], **ap, **argp;
++    char *cp, buf[BUFSIZ], **ap, **argp;
+     char *arguments[MAXARGS], *vec[MAXARGS];
+     struct stat st;
+ 
+@@ -714,15 +714,15 @@
+ #endif
+ 
+     if (arg)
+-	copyip (arg, vec);
+-    if ((cp = context_find (sp))) {
++	copyip_n (arg, vec, MAXARGS);
++    if ((cp = context_find (sp)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+     if (arg)
+-	copyip (vec, ap);
++	copyip_n (vec, ap, MAXARGS);
+     argp = arguments;
+ 
+     debugsw = 0;
+@@ -748,7 +748,7 @@
+ 		    return;
+ 
+ 		case SHELPSW: 
+-		    sprintf (buf, "%s [switches]", sp);
++		    snprintf (buf, BUFSIZ, "%s [switches]", sp);
+ 		    print_help (buf, sendswitches, 1);
+ 		    return;
+ 		case SVERSIONSW:
+@@ -840,7 +840,7 @@
+     }
+ 
+     /* allow Aliasfile: profile entry */
+-    if ((cp = context_find ("Aliasfile"))) {
++    if ((cp = context_find ("Aliasfile")) != NULL) {
+ 	char *dp = NULL;
+ 
+ 	for (ap = brkstring(dp = getcpy(cp), " ", "\n"); ap && *ap; ap++) {
+@@ -854,7 +854,7 @@
+ 	    m_putenv ("SIGNATURE", cp);
+ #ifdef UCI
+ 	else {
+-	    sprintf (buf, "%s/.signature", mypath);
++	    snprintf (buf, BUFSIZ, "%s/.signature", mypath);
+ 	    if ((fp = fopen (buf, "r")) != NULL
+ 		&& fgets (buf, sizeof(buf), fp) != NULL) {
+ 		    fclose (fp);
+@@ -922,7 +922,7 @@
+ 	    vec[vecp++] = r1bindex (whomproc, '/');
+ 	    vec[vecp++] = file;
+ 	    if (arg)
+-		while (*arg)
++		while (*arg && vecp <MAXARGS-1)
+ 		    vec[vecp++] = *arg++;
+ 	    vec[vecp] = NULL;
+ 
+--- nmh-0.27/uip/whom.c.security	Mon Jun 22 16:21:33 1998
++++ nmh-0.27/uip/whom.c	Sat Jul 18 16:38:25 1998
+@@ -46,19 +46,19 @@
+     int distsw = 0, vecp = 0;
+     char *cp, *dfolder = NULL, *dmsg = NULL;
+     char *msg = NULL, **ap, **argp, backup[BUFSIZ];
+-    char buf[100], *arguments[MAXARGS], *vec[MAXARGS];
++    char buf[BUFSIZ], *arguments[MAXARGS], *vec[MAXARGS];
+ 
+ #ifdef LOCALE
+     setlocale(LC_ALL, "");
+ #endif
+     invo_name = r1bindex (argv[0], '/');
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n(ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     vec[vecp++] = invo_name;
+@@ -76,7 +76,7 @@
+ 		    adios (NULL, "-%s unknown", cp);
+ 
+ 		case HELPSW: 
+-		    sprintf (buf, "%s [switches] [file]", invo_name);
++		    snprintf (buf, BUFSIZ, "%s [switches] [file]", invo_name);
+ 		    print_help (buf, switches, 1);
+ 		    done (1);
+ 		case VERSIONSW:
+@@ -124,15 +124,17 @@
+ 	}
+ 	if (msg)
+ 	    adios (NULL, "only one draft at a time!");
+-	else
++	else if(vecp<MAXARGS-1)
+ 	    vec[vecp++] = msg = cp;
+     }
+ 
+     /* allow Aliasfile: profile entry */
+-    if ((cp = context_find ("Aliasfile"))) {
++    if ((cp = context_find ("Aliasfile")) != NULL) {
+ 	char *dp = NULL;
+ 
+ 	for (ap = brkstring(dp = getcpy(cp), " ", "\n"); ap && *ap; ap++) {
++	    if(vecp>MAXARGS-3)
++	    	break;
+ 	    vec[vecp++] = "-alias";
+ 	    vec[vecp++] = *ap;
+ 	}
+@@ -143,7 +145,8 @@
+ 	if (dfolder || (cp = getenv ("mhdraft")) == NULL || *cp == '\0')
+ #endif	/* WHATNOW */
+ 	    cp  = getcpy (m_draft (dfolder, dmsg, 1, &isdf));
+-	msg = vec[vecp++] = cp;
++	if(vecp<MAXARGS-1)
++		msg = vec[vecp++] = cp;
+     }
+     if ((cp = getenv ("mhdist"))
+ 	    && *cp
+@@ -152,7 +155,8 @@
+ 	    && *cp) {
+ 	if (distout (msg, cp, backup) == NOTOK)
+ 	    done (1);
+-	vec[vecp++] = "-dist";
++	if(vecp<MAXARGS-1)
++		vec[vecp++] = "-dist";
+ 	distsw++;
+     }
+     vec[vecp] = NULL;
+--- nmh-0.27/uip/wmh.c.security	Wed Jan 14 21:21:16 1998
++++ nmh-0.27/uip/wmh.c	Sat Jul 18 14:04:49 1998
+@@ -148,11 +148,11 @@
+     invo_name = r1bindex (argv[0], '/');
+     if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     }
+     else
+ 	ap = arguments;
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++))
+@@ -162,7 +162,8 @@
+ 		    ambigsw (cp, switches);
+ 		    done (1);
+ 		case UNKWNSW: 
+-		    vec[vecp++] = --cp;
++		    if(vecp<MAXARGS)
++		    	vec[vecp++] = --cp;
+ 		    continue;
+ 
+ 		case HELPSW: 
+@@ -186,8 +187,8 @@
+ 		    nprog++;
+ 		    continue;
+ 	    }
+-	else
+-	    vec[vecp++] = cp;
++	else if(vecp<MAXARGS-1)
++		vec[vecp++] = cp;
+ 
+     SIGinit ();
+     if (WINinit (nprog) == NOTOK) {
+@@ -213,7 +214,7 @@
+     for (;;) {
+ 	pLOOP (RC_QRY, NULL);
+ 
+-	sprintf (prompt, myprompt, invo_name);
++	snprintf (prompt, BUFSIZ, myprompt, invo_name);
+ 
+ 	switch (WINgetstr (Command, prompt, buffer)) {
+ 	    case NOTOK: 
+@@ -255,10 +256,10 @@
+ 	    close (pfd1[1]);
+ 
+ 	    vec[vecp++] = "-vmhread";
+-	    sprintf (buf1, "%d", pfd1[0]);
++	    snprintf (buf1, BUFSIZ, "%d", pfd1[0]);
+ 	    vec[vecp++] = buf1;
+ 	    vec[vecp++] = "-vmhwrite";
+-	    sprintf (buf2, "%d", pfd0[1]);
++	    snprintf (buf2, BUFSIZ, "%d", pfd0[1]);
+ 	    vec[vecp++] = buf2;
+ 	    vec[vecp] = NULL;
+ 
+@@ -288,15 +289,16 @@
+     char buffer[BUFSIZ];
+     struct record rcs, *rc;
+     WINDOW **w;
++    int len=BUFSIZ;
+ 
+     rc = &rcs;
+     initrc (rc);
+ 
+     bp = buffer;
+-    sprintf (bp, "%d %d", RC_VRSN, numwins);
++    len-=snprintf (bp, BUFSIZ, "%d %d", RC_VRSN, numwins);
+     bp += strlen (bp);
+     for (w = windows; *w; w++) {
+-	sprintf (bp, " %d", (*w)->w_height);
++	len-=snprintf (bp, len, " %d", (*w)->w_height);
+ 	bp += strlen (bp);
+     }
+ 
+@@ -1325,7 +1327,7 @@
+ 	iov++;
+     }
+     
+-    vsprintf (buffer, fmt, ap);
++    vsnprintf (buffer, BUFSIZ, fmt, ap);
+     iov->iov_len = strlen (iov->iov_base = buffer);
+     iov++;
+     if (what) {
+@@ -1338,7 +1340,7 @@
+ 	    iov++;
+ 	}
+ 	if (!(iov->iov_base = strerror (eindex))) {
+-	    sprintf (err, "unknown error %d", eindex);
++	    snprintf (err, BUFSIZ, "unknown error %d", eindex);
+ 	    iov->iov_base = err;
+ 	}
+ 	iov->iov_len = strlen (iov->iov_base);
+@@ -1368,7 +1370,7 @@
+     char buffer[BUFSIZ];
+ 
+     for (i = 0, cp = NULL; i < n; i++, iov++) {
+-	sprintf (buffer, "%*.*s", iov->iov_len, iov->iov_len,
++	snprintf (buffer, BUFSIZ, "%*.*s", iov->iov_len, iov->iov_len,
+ 		iov->iov_base);
+ 	cp = add (buffer, cp);
+     }
+--- nmh-0.27/uip/mhmisc.c.security	Sat Jul 18 14:42:48 1998
++++ nmh-0.27/uip/mhmisc.c	Sat Jul 18 14:50:24 1998
+@@ -135,16 +135,17 @@
+     char *bp;
+     char buffer[BUFSIZ];
+     CI ci;
++    int len=BUFSIZ-2;
+ 
+     bp = buffer;
+ 
+     if (userrs && invo_name && *invo_name) {
+-	sprintf (bp, "%s: ", invo_name);
++	len-=snprintf (bp, len, "%s: ", invo_name);
+ 	bp += strlen (bp);
+     }
+ 
+     va_start (arglist, fmt);
+-    vsprintf (bp, fmt, arglist);
++    len-=vsnprintf (bp, len, fmt, arglist);
+     bp += strlen (bp);
+     ci = &ct->c_ctinfo;
+ 
+@@ -152,28 +153,28 @@
+ 	char *s;
+ 
+ 	if (*what) {
+-	    sprintf (bp, " %s: ", what);
++	    len-=snprintf (bp, len, " %s: ", what);
+ 	    bp += strlen (bp);
+ 	}
+ 	if ((s = strerror (errno)))
+-	    sprintf (bp, "%s", s);
++	    len-=snprintf (bp, len, "%s", s);
+ 	else
+-	    sprintf (bp, "Error %d", errno);
++	    len-=snprintf (bp, len, "Error %d", errno);
+ 	bp += strlen (bp);
+     }
+ 
+     i = strlen (invo_name) + 2;
+-    sprintf (bp, "\n%*.*s(content %s/%s", i, i, "", ci->ci_type, ci->ci_subtype);
++    len-=snprintf (bp, len, "\n%*.*s(content %s/%s", i, i, "", ci->ci_type, ci->ci_subtype);
+     bp += strlen (bp);
+     if (ct->c_file) {
+-	sprintf (bp, " in message %s", ct->c_file);
++	len-=snprintf (bp, len, " in message %s", ct->c_file);
+ 	bp += strlen (bp);
+ 	if (ct->c_partno) {
+-	    sprintf (bp, ", part %s", ct->c_partno);
++	    len-=snprintf (bp, len, ", part %s", ct->c_partno);
+ 	    bp += strlen (bp);
+ 	}
+     }
+-    sprintf (bp, ")");
++    len-=snprintf (bp, len, ")");
+     bp += strlen (bp);
+ 
+     if (userrs) {
+--- nmh-0.27/uip/mhlistsbr.c.security	Sat Jul 18 14:44:13 1998
++++ nmh-0.27/uip/mhlistsbr.c	Sat Jul 18 14:45:47 1998
+@@ -162,7 +162,7 @@
+ 
+     printf (toplevel > 0 ? LSTFMT2a : toplevel < 0 ? "part " : "     ",
+ 	    atoi (r1bindex (empty (ct->c_file), '/')));
+-    sprintf (buffer, "%s/%s", empty (ci->ci_type), empty (ci->ci_subtype));
++    snprintf (buffer, BUFSIZ, "%s/%s", empty (ci->ci_type), empty (ci->ci_subtype));
+     printf (LSTFMT2b, empty (ct->c_partno), buffer);
+ 
+     if (ct->c_cesizefnx && realsize)
+@@ -213,7 +213,7 @@
+ 
+ 	dp = trimcpy (cp = add (ci->ci_comment, NULL));
+ 	free (cp);
+-	sprintf (buffer, "(%s)", dp);
++	snprintf (buffer, BUFSIZ, "(%s)", dp);
+ 	free (dp);
+ 	printf (LSTFMT2d2, buffer);
+     }
+--- nmh-0.27/uip/mhbuildsbr.c.security	Sat Jul 18 14:51:08 1998
++++ nmh-0.27/uip/mhbuildsbr.c	Sat Jul 18 15:44:33 1998
+@@ -1026,7 +1026,7 @@
+     bp = buffer;
+     cp++;
+ 
+-    for (i = 0;;) {
++    for (i = 0;bp-buffer<BUFSIZ-1;) {
+ 	switch (c = *cp++) {
+ 	case '\0':
+ invalid:
+@@ -1310,19 +1310,19 @@
+ 	int partnum;
+ 	char *pp;
+ 	char partnam[BUFSIZ];
++	int l=BUFSIZ;
+ 
++	pp = partnam;
+ 	if (ct->c_partno) {
+-	    sprintf (partnam, "%s.", ct->c_partno);
+-	    pp = partnam + strlen (partnam);
++	    l-=snprintf (partnam, l, "%s.", ct->c_partno);
++	    pp += strlen (partnam);
+ 	}
+-	else
+-	    pp = partnam;
+ 
+ 	for (part = m->mp_parts, partnum = 1; part;
+ 	         part = part->mp_next, partnum++) {
+ 	    p = part->mp_part;
+ 
+-	    sprintf (pp, "%d", partnum);
++	    l-=snprintf (pp, l, "%d", partnum);
+ 	    p->c_partno = add (partnam, NULL);
+ 
+ 	    if (p->c_ctinitfnx && (*p->c_ctinitfnx) (p) == NOTOK) {
+@@ -2160,7 +2160,7 @@
+ 	    putc (';', ce->ce_fp);
+ 	    len++;
+ 
+-	    sprintf (buffer, "%s=\"%s\"", *ap, *ep);
++	    snprintf (buffer, BUFSIZ, "%s=\"%s\"", *ap, *ep);
+ 
+ 	    if (len + 1 + (cc = strlen (buffer)) >= CPERLIN) {
+ 		fputs ("\n\t", ce->ce_fp);
+@@ -2385,11 +2385,12 @@
+     CE ce;
+     static char *username = NULL;
+     static char *password = NULL;
++    int len=BUFSIZ;
+ 
+     e  = ct->c_ctexbody;
+     ce = ct->c_cefile;
+ 
+-    sprintf (buffer, "%s-access-ftp", invo_name);
++    snprintf (buffer, BUFSIZ, "%s-access-ftp", invo_name);
+     if ((ftp = context_find (buffer)) && !*ftp)
+ 	ftp = NULL;
+ 
+@@ -2423,26 +2424,26 @@
+     }
+ 
+     bp = buffer;
+-    sprintf (bp, "Retrieve %s", e->eb_name);
++    len-=snprintf (bp, len, "Retrieve %s", e->eb_name);
+     bp += strlen (bp);
+     if (e->eb_partno) {
+-	sprintf (bp, " (content %s)", e->eb_partno);
++	len-=snprintf (bp, len, " (content %s)", e->eb_partno);
+ 	bp += strlen (bp);
+     }
+-    sprintf (bp, "\n    using %sFTP from site %s",
++    len-=snprintf (bp, len, "\n    using %sFTP from site %s",
+ 		    e->eb_flags ? "anonymous " : "", e->eb_site);
+     bp += strlen (bp);
+     if (e->eb_size > 0) {
+-	sprintf (bp, " (%lu octets)", e->eb_size);
++	len-=snprintf (bp, len, " (%lu octets)", e->eb_size);
+ 	bp += strlen (bp);
+     }
+-    sprintf (bp, "? ");
++    len-=snprintf (bp, len, "? ");
+     if (!getanswer (buffer))
+ 	return NOTOK;
+ 
+     if (e->eb_flags) {
+ 	user = "anonymous";
+-	sprintf (pass = buffer, "%s@%s", getusername (), LocalName ());
++	snprintf (pass = buffer, BUFSIZ, "%s@%s", getusername (), LocalName ());
+     } else {
+ 	ruserpass (e->eb_site, &username, &password);
+ 	user = username;
+@@ -2587,6 +2588,7 @@
+     char *bp, buffer[BUFSIZ], *vec[7];
+     struct exbody *e = ct->c_ctexbody;
+     CE ce = ct->c_cefile;
++    int len=BUFSIZ;
+ 
+     switch (openExternal (e->eb_parent, e->eb_content, ce, file, &fd)) {
+ 	case NOTOK:
+@@ -2612,13 +2614,13 @@
+     }
+ 
+     bp = buffer;
+-    sprintf (bp, "Retrieve content");
++    len-=snprintf (bp, len, "Retrieve content");
+     bp += strlen (bp);
+     if (e->eb_partno) {
+-	sprintf (bp, " %s", e->eb_partno);
++	len-=snprintf (bp, len, " %s", e->eb_partno);
+ 	bp += strlen (bp);
+     }
+-    sprintf (bp, " by asking %s\n\n%s\n? ",
++    len-=snprintf (bp, len, " by asking %s\n\n%s\n? ",
+ 		    e->eb_server,
+ 		    e->eb_subject ? e->eb_subject : e->eb_body);
+     if (!getanswer (buffer))
+@@ -2733,6 +2735,7 @@
+ 
+     if (status == OK && policy == CACHE_ASK) {
+ 	char *bp, query[BUFSIZ];
++	int ql=BUFSIZ;
+ 
+ 	if (xpid) {
+ 	    if (xpid < 0)
+@@ -2742,23 +2745,24 @@
+ 	}
+ 
+ 	bp = query;
+-	if (writing)
+-	    sprintf (bp, "Make cached, publically-accessible copy");
+-	else {
++	if (writing) {
++	    ql-=snprintf (bp, ql, "Make cached, publically-accessible copy");
++	    bp += strlen (bp);
++	} else {
+ 	    struct stat st;
+ 
+-	    sprintf (bp, "Use cached copy");
++	    ql-=snprintf (bp, ql, "Use cached copy");
+ 	    bp += strlen (bp);
+ 	    if (ct->c_partno) {
+-		sprintf (bp, " of content %s", ct->c_partno);
++		ql-=snprintf (bp, ql, " of content %s", ct->c_partno);
+ 		bp += strlen (bp);
+ 	    }
+ 	    stat (buffer, &st);
+-	    sprintf (bp, " (size %lu octets)",
++	    ql-=snprintf (bp, ql, " (size %lu octets)",
+ 			    (unsigned long) st.st_size);
++	    bp += strlen (bp);
+ 	}
+-	bp += strlen (bp);
+-	sprintf (bp, "\n    in file %s? ", buffer);
++	ql-=snprintf (bp, ql, "\n    in file %s? ", buffer);
+ 	if (!getanswer (query))
+ 	    status = NOTOK;
+     }
+@@ -2791,7 +2795,7 @@
+     if (debugsw)
+ 	fprintf (stderr, "find_cache_aux %s usemap=%d\n", directory, usemap);
+ 
+-    sprintf (mapfile, "%s/cache.map", directory);
++    snprintf (mapfile, BUFSIZ, "%s/cache.map", directory);
+     if (find_cache_aux2 (mapfile, id, mapname) == OK)
+ 	goto done_map;
+ 
+@@ -2800,7 +2804,7 @@
+ 	    return NOTOK;
+ 
+ use_raw:
+-	sprintf (buffer, "%s/%s", directory, id);
++	snprintf (buffer, BUFSIZ, "%s/%s", directory, id);
+ 	return OK;
+     }
+ 
+@@ -2826,7 +2830,7 @@
+ 	    partno = 0;
+ 	}
+ 
+-    sprintf (mapname, "%08x%04x%02x",
++    snprintf (mapname, BUFSIZ, "%08x%04x%02x",
+ 		(unsigned int) (clock & 0xffffffff),
+ 		(unsigned int) (pid & 0xffff),
+ 		(unsigned int) (partno++ & 0xff));
+@@ -2852,9 +2856,9 @@
+ 
+ done_map:
+     if (*mapname == '/')
+-	strcpy (buffer, mapname);
++	strncpy (buffer, mapname, BUFSIZ);
+     else
+-	sprintf (buffer, "%s/%s", directory, mapname);
++	snprintf (buffer, BUFSIZ, "%s/%s", directory, mapname);
+     if (debugsw)
+ 	fprintf (stderr, "use %s\n", buffer);
+ 
+@@ -2996,7 +3000,7 @@
+ 	    adios (ct->c_file, "unable to open for writing");
+ 
+ 	if (buf[0] == '#' && buf[1] == '<') {
+-	    strcpy (content, buf + 2);
++	    strncpy (content, buf + 2, BUFSIZ);
+ 	    inlineD = 1;
+ 	    goto rock_and_roll;
+ 	} else {
+@@ -3005,7 +3009,7 @@
+ 
+ 	strcpy (content, "text/plain");		/* the directive is implicit */
+ 	headers = 0;
+-	strcpy (buffer, buf[0] != '#' ? buf : buf + 1);
++	strncpy (buffer, buf[0] != '#' ? buf : buf + 1, BUFSIZ);
+ 	for (;;) {
+ 	    int	i;
+ 
+@@ -3157,7 +3161,7 @@
+ 		       ci->ci_type, ci->ci_subtype);
+ 	    p = ct;
+ 
+-	    sprintf (buffer, "message/external-body; %s", ci->ci_magic);
++	    snprintf (buffer, BUFSIZ, "message/external-body; %s", ci->ci_magic);
+ 	    free (ci->ci_magic);
+ 	    ci->ci_magic = NULL;
+ 
+@@ -3214,9 +3218,9 @@
+ 	 * No [file] argument, so check profile for
+ 	 * method to compose content.
+ 	 */
+-	sprintf (buffer, "%s-compose-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
++	snprintf (buffer, BUFSIZ, "%s-compose-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
+ 	if ((cp = context_find (buffer)) == NULL || *cp == '\0') {
+-	    sprintf (buffer, "%s-compose-%s", invo_name, ci->ci_type);
++	    snprintf (buffer, BUFSIZ, "%s-compose-%s", invo_name, ci->ci_type);
+ 	    if ((cp = context_find (buffer)) == NULL || *cp == '\0') {
+ 		content_error (NULL, ct, "don't know how to compose content");
+ 		done (1);
+@@ -3240,7 +3244,7 @@
+ 
+ 	if (ci->ci_magic) {
+ 	    ap = brkstring (ci->ci_magic, " ", "\n");
+-	    ap = copyip (ap, arguments);
++	    ap = copyip_n (ap, arguments, MAXARGS);
+ 	} else {
+ 	    arguments[0] = "cur";
+ 	    arguments[1] = NULL;
+@@ -3298,7 +3302,7 @@
+ 		    p->c_type = CT_MESSAGE;
+ 		    p->c_subtype = MESSAGE_RFC822;
+ 
+-		    sprintf (buffer, "%s/%d", mp->foldpath, msgnum);
++		    snprintf (buffer, BUFSIZ, "%s/%d", mp->foldpath, msgnum);
+ 		    p->c_file = add (buffer, NULL);
+ 		    if (listsw && stat (p->c_file, &st) != NOTOK)
+ 			p->c_end = (long) st.st_size;
+@@ -3317,7 +3321,7 @@
+ 	    ct->c_subtype = MESSAGE_RFC822;
+ 
+ 	    msgnum = mp->lowsel;
+-	    sprintf (buffer, "%s/%d", mp->foldpath, msgnum);
++	    snprintf (buffer, BUFSIZ, "%s/%d", mp->foldpath, msgnum);
+ 	    ct->c_file = add (buffer, NULL);
+ 	    if (listsw && stat (ct->c_file, &st) != NOTOK)
+ 		ct->c_end = (long) st.st_size;
+@@ -3357,7 +3361,7 @@
+ 	}
+ 
+ 	free_ctinfo (ct);
+-	sprintf (buffer, "multipart/%s", cp);
++	snprintf (buffer, BUFSIZ, "multipart/%s", cp);
+ 	if (get_ctinfo (buffer, ct, 0) == NOTOK)
+ 	    done (1);
+ 	ct->c_type = CT_MULTIPART;
+@@ -3408,12 +3412,12 @@
+ 
+     if (clock == 0) {
+ 	time (&clock);
+-	sprintf (msgid, "<%d.%ld.%%d@%s>\n",
++	snprintf (msgid, BUFSIZ, "<%d.%ld.%%d@%s>\n",
+ 		(int) getpid(), (long) clock, LocalName());
+ 	partno = 0;
+ 	msgfmt = getcpy(msgid);
+     }
+-    sprintf (msgid, msgfmt, top ? 0 : ++partno);
++    snprintf (msgid, BUFSIZ, msgfmt, top ? 0 : ++partno);
+     ct->c_id = getcpy (msgid);
+ }
+ 
+@@ -3474,18 +3478,18 @@
+ 	char partnam[BUFSIZ];
+ 	struct multipart *m = (struct multipart *) ct->c_ctparams;
+ 	struct part *part;
++	int len = BUFSIZ;
+ 
++	pp = partnam;
+ 	if (ct->c_partno) {
+-	    sprintf (partnam, "%s.", ct->c_partno);
+-	    pp = partnam + strlen (partnam);
+-	} else {
+-	    pp = partnam;
++	    len-=snprintf (partnam, len, "%s.", ct->c_partno);
++	    pp += strlen (partnam);
+ 	}
+ 
+ 	for (part = m->mp_parts, partnum = 1; part; part = part->mp_next, partnum++) {
+ 	    CT p = part->mp_part;
+ 
+-	    sprintf (pp, "%d", partnum);
++	    len-=snprintf (pp, len, "%d", partnum);
+ 	    p->c_partno = add (partnam, NULL);
+ 	    if (compose_content (p) == NOTOK)
+ 		return NOTOK;
+@@ -3542,6 +3546,7 @@
+ 	    char *bp, **ap;
+ 	    char *vec[4];
+ 	    FILE *out;
++	    int len;
+ 
+ 	    if (!(cp = ci->ci_magic))
+ 		adios (NULL, "internal error(5)");
+@@ -3555,6 +3560,7 @@
+ 	    /*
+ 	     * Parse composition string
+ 	     */
++	    len = BUFSIZ;
+ 	    for (bp = buffer; *cp; cp++) {
+ 		if (*cp == '%') {
+ 		    switch (*++cp) {
+@@ -3565,7 +3571,7 @@
+ 			char *s = "";
+ 
+ 			for (ap = ci->ci_attrs, ep = ci->ci_values; *ap; ap++, ep++) {
+-			    sprintf (bp, "%s%s=\"%s\"", s, *ap, *ep);
++			    len-=snprintf (bp, len, "%s%s=\"%s\"", s, *ap, *ep);
+ 			    bp += strlen (bp);
+ 			    s = " ";
+ 			}
+@@ -3582,12 +3588,12 @@
+ 			 * insert temporary filename where
+ 			 * content should be written
+ 			 */
+-			sprintf (bp, "%s", ct->c_file);
++			snprintf (bp, len, "%s", ct->c_file);
+ 			break;
+ 
+ 		    case 's':
+ 			/* insert content subtype */
+-			strcpy (bp, ci->ci_subtype);
++			strncpy (bp, ci->ci_subtype, len);
+ 			break;
+ 
+ 		    case '%':
+@@ -3595,15 +3601,24 @@
+ 			goto raw;
+ 
+ 		    default:
+-			*bp++ = *--cp;
+-			*bp = '\0';
++			if (len>1) {
++				*bp++ = *--cp;
++				*bp = '\0';
++				len--;
++			}
+ 			continue;
+ 		    }
+-		    bp += strlen (bp);
++		    if (*bp) {
++			len -= strlen (bp);
++			bp += strlen (bp);
++		    }
+ 		} else {
+ raw:
+-		*bp++ = *cp;
+-		*bp = '\0';
++		    if (len>1) {
++			*bp++ = *cp;
++			*bp = '\0';
++			len--;
++		    }
+ 		}
+ 	    }
+ 
+@@ -3910,7 +3925,7 @@
+ 
+ 	ap = ci->ci_attrs;
+ 	ep = ci->ci_values;
+-	sprintf (buffer, "boundary=%s%d", prefix, level++);
++	snprintf (buffer, BUFSIZ, "boundary=%s%d", prefix, level++);
+ 	cp = strchr(*ap++ = add (buffer, NULL), '=');
+ 	*ap = NULL;
+ 	*cp++ = '\0';
+@@ -3948,7 +3963,7 @@
+ 
+ 	putc (';', out);
+ 	len++;
+-	sprintf (buffer, "%s=\"%s\"", *ap, *ep);
++	snprintf (buffer, BUFSIZ, "%s=\"%s\"", *ap, *ep);
+ 
+ 	if (len + 1 + (cc = strlen (buffer)) >= CPERLIN) {
+ 	    fputs ("\n\t", out);
+--- nmh-0.27/uip/viamail.c.security	Sat Jul 18 15:25:45 1998
++++ nmh-0.27/uip/viamail.c	Sat Jul 18 16:37:27 1998
+@@ -73,7 +73,7 @@
+     int delay = 0;
+     char *f1 = NULL, *f2 = NULL, *f3 = NULL;
+     char *f4 = NULL, *f5 = NULL, *f7 = NULL;
+-    char *cp, buf[100], **ap;
++    char *cp, buf[BUFSIZ], **ap;
+     char **argp, *arguments[MAXARGS];
+ 
+ #ifdef LOCALE
+@@ -87,13 +87,13 @@
+     if (context_foil (NULL) == -1)
+ 	done (1);
+ 
+-    if ((cp = context_find (invo_name))) {
++    if ((cp = context_find (invo_name)) != NULL) {
+ 	ap = brkstring (cp = getcpy (cp), " ", "\n");
+-	ap = copyip (ap, arguments);
++	ap = copyip_n (ap, arguments, MAXARGS);
+     } else {
+ 	ap = arguments;
+     }
+-    copyip (argv + 1, ap);
++    copyip_n (argv + 1, ap, MAXARGS);
+     argp = arguments;
+ 
+     while ((cp = *argp++)) {
+@@ -106,7 +106,7 @@
+ 		adios (NULL, "-%s unknown", cp);
+ 
+ 	    case HELPSW: 
+-		sprintf (buf, "%s [switches]", invo_name);
++		snprintf (buf, BUFSIZ, "%s [switches]", invo_name);
+ 		print_help (buf, switches, 1);
+ 		done (1);
+ 	    case VERSIONSW:
+--- nmh-0.27/uip/mhshowsbr.c.security	Sat Jul 18 15:51:18 1998
++++ nmh-0.27/uip/mhshowsbr.c	Sat Jul 18 16:03:47 1998
+@@ -293,12 +293,12 @@
+     CI ci = &ct->c_ctinfo;
+ 
+     /* Check for mhn-show-type/subtype */
+-    sprintf (buffer, "%s-show-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
++    snprintf (buffer, BUFSIZ, "%s-show-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
+     if ((cp = context_find (buffer)) && *cp != '\0')
+ 	return show_content_aux (ct, serial, alternate, cp, NULL);
+ 
+     /* Check for mhn-show-type */
+-    sprintf (buffer, "%s-show-%s", invo_name, ci->ci_type);
++    snprintf (buffer, BUFSIZ, "%s-show-%s", invo_name, ci->ci_type);
+     if ((cp = context_find (buffer)) && *cp != '\0')
+ 	return show_content_aux (ct, serial, alternate, cp, NULL);
+ 
+@@ -325,6 +325,7 @@
+     char *bp, *file;
+     char buffer[BUFSIZ];
+     CI ci = &ct->c_ctinfo;
++    int len;
+ 
+     if (!ct->c_ceopenfnx) {
+ 	if (!alternate)
+@@ -345,11 +346,12 @@
+     xtty   = 0;
+ 
+     if (cracked) {
+-	strcpy (buffer, cp);
++	strncpy (buffer, cp, BUFSIZ);
+ 	goto got_command;
+     }
+     buffer[0] = '\0';
+ 
++    len = BUFSIZ;
+     for (bp = buffer; *cp; cp++) {
+ 	if (*cp == '%') {
+ 	    switch (*++cp) {
+@@ -360,7 +362,7 @@
+ 		char *s = "";
+ 
+ 		for (ap = ci->ci_attrs, ep = ci->ci_values; *ap; ap++, ep++) {
+-		    sprintf (bp, "%s%s=\"%s\"", s, *ap, *ep);
++		    len-=snprintf (bp, len, "%s%s=\"%s\"", s, *ap, *ep);
+ 		    bp += strlen (bp);
+ 		    s = " ";
+ 		}
+@@ -372,7 +374,7 @@
+ 		if (ct->c_descr) {
+ 		    char *s;
+ 
+-		    strcpy (bp, s = trimcpy (ct->c_descr));
++		    strncpy (bp, s = trimcpy (ct->c_descr), len);
+ 		    free (s);
+ 		}
+ 		break;
+@@ -390,7 +392,7 @@
+ 
+ 	    case 'f':
+ 		/* insert filename containing content */
+-		sprintf (bp, "%s", file);
++		snprintf (bp, len, "%s", file);
+ 		break;
+ 
+ 	    case 'p':
+@@ -405,7 +407,7 @@
+ 
+ 	    case 's':
+ 		/* insert subtype of content */
+-		strcpy (bp, ci->ci_subtype);
++		strncpy (bp, ci->ci_subtype, len);
+ 		break;
+ 
+ 	    case '%':
+@@ -413,15 +415,24 @@
+ 		goto raw;
+ 
+ 	    default:
+-		*bp++ = *--cp;
+-		*bp = '\0';
++		if (len>1) {
++			*bp++ = *--cp;
++			*bp = '\0';
++			len--;
++		}
+ 		continue;
+ 	    }
+-	    bp += strlen (bp);
++	    if (*bp) {
++		len -= strlen (bp);
++		bp += strlen (bp);
++	    }
+ 	} else {
+ raw:
+-	*bp++ = *cp;
+-	*bp = '\0';
++		if (len>1) {
++			*bp++ = *cp;
++			*bp = '\0';
++			len--;
++		}
+ 	}
+     }
+ 
+@@ -430,7 +441,7 @@
+ 	char term[BUFSIZ];
+ 
+ 	strcpy (term, buffer);
+-	sprintf (buffer, ct->c_termproc, term);
++	snprintf (buffer, BUFSIZ, ct->c_termproc, term);
+     }
+ 
+ got_command:
+@@ -556,12 +567,12 @@
+     CI ci = &ct->c_ctinfo;
+ 
+     /* Check for mhn-show-type/subtype */
+-    sprintf (buffer, "%s-show-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
++    snprintf (buffer, BUFSIZ, "%s-show-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
+     if ((cp = context_find (buffer)) && *cp != '\0')
+ 	return show_content_aux (ct, serial, alternate, cp, NULL);
+ 
+     /* Check for mhn-show-type */
+-    sprintf (buffer, "%s-show-%s", invo_name, ci->ci_type);
++    snprintf (buffer, BUFSIZ, "%s-show-%s", invo_name, ci->ci_type);
+     if ((cp = context_find (buffer)) && *cp != '\0')
+ 	return show_content_aux (ct, serial, alternate, cp, NULL);
+ 
+@@ -570,7 +581,7 @@
+      * if it is not a text part of a multipart/alternative
+      */
+     if (!alternate || ct->c_subtype == TEXT_PLAIN) {
+-	sprintf (buffer, "%%p%s '%%F'", progsw ? progsw :
++	snprintf (buffer, BUFSIZ, "%%p%s '%%F'", progsw ? progsw :
+ 		moreproc && *moreproc ? moreproc : "more");
+ 	cp = (ct->c_showproc = add (buffer, NULL));
+ 	return show_content_aux (ct, serial, alternate, cp, NULL);
+@@ -591,12 +602,12 @@
+     CI ci = &ct->c_ctinfo;
+ 
+     /* Check for mhn-show-type/subtype */
+-    sprintf (buffer, "%s-show-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
++    snprintf (buffer, BUFSIZ, "%s-show-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
+     if ((cp = context_find (buffer)) && *cp != '\0')
+ 	return show_multi_aux (ct, serial, alternate, cp);
+ 
+     /* Check for mhn-show-type */
+-    sprintf (buffer, "%s-show-%s", invo_name, ci->ci_type);
++    snprintf (buffer, BUFSIZ, "%s-show-%s", invo_name, ci->ci_type);
+     if ((cp = context_find (buffer)) && *cp != '\0')
+ 	return show_multi_aux (ct, serial, alternate, cp);
+ 
+@@ -769,6 +780,7 @@
+     struct part *part;
+     CI ci = &ct->c_ctinfo;
+     CT p;
++    int len;
+ 
+     for (part = m->mp_parts; part; part = part->mp_next) {
+ 	p = part->mp_part;
+@@ -798,6 +810,7 @@
+     xtty      = 0;
+     buffer[0] = '\0';
+ 
++    len = BUFSIZ;
+     for (bp = buffer; *cp; cp++) {
+ 	if (*cp == '%') {
+ 	    switch (*++cp) {
+@@ -808,7 +821,7 @@
+ 		char *s = "";
+ 
+ 		for (ap = ci->ci_attrs, ep = ci->ci_values; *ap; ap++, ep++) {
+-		    sprintf (bp, "%s%s=\"%s\"", s, *ap, *ep);
++		    len-=snprintf (bp, len, "%s%s=\"%s\"", s, *ap, *ep);
+ 		    bp += strlen (bp);
+ 		    s = " ";
+ 		}
+@@ -820,7 +833,7 @@
+ 		if (ct->c_descr) {
+ 		    char *s;
+ 
+-		    strcpy (bp, s = trimcpy (ct->c_descr));
++		    strncpy (bp, s = trimcpy (ct->c_descr), len);
+ 		    free (s);
+ 		}
+ 		break;
+@@ -843,7 +856,7 @@
+ 		for (part = m->mp_parts; part; part = part->mp_next) {
+ 		    p = part->mp_part;
+ 
+-		    sprintf (bp, "%s'%s'", s, p->c_storage);
++		    len-=snprintf (bp, len, "%s'%s'", s, p->c_storage);
+ 		    bp += strlen (bp);
+ 		    s = " ";
+ 		}
+@@ -862,7 +875,7 @@
+ 
+ 	    case 's':
+ 		/* insert subtype of content */
+-		strcpy (bp, ci->ci_subtype);
++		strncpy (bp, ci->ci_subtype, len);
+ 		break;
+ 
+ 	    case '%':
+@@ -870,15 +883,24 @@
+ 		goto raw;
+ 
+ 	    default:
+-		*bp++ = *--cp;
+-		*bp = '\0';
++		if (len>1) {
++			*bp++ = *--cp;
++			*bp = '\0';
++			len--;
++		}
+ 		continue;
+ 	    }
+-	    bp += strlen (bp);
++	    if (*bp) {
++		len -= strlen(bp);
++		bp += strlen (bp);
++	    }
+ 	} else {
+ raw:
+-	*bp++ = *cp;
+-	*bp = '\0';
++		if (len>1) {
++			*bp++ = *cp;
++			*bp = '\0';
++			len--;
++		}
+ 	}
+     }
+ 
+@@ -887,7 +909,7 @@
+ 	char term[BUFSIZ];
+ 
+ 	strcpy (term, buffer);
+-	sprintf (buffer, ct->c_termproc, term);
++	snprintf (buffer, BUFSIZ, ct->c_termproc, term);
+     }
+ 
+     return show_content_aux2 (ct, serial, alternate, NULL, buffer,
+@@ -906,12 +928,12 @@
+     CI ci = &ct->c_ctinfo;
+ 
+     /* Check for mhn-show-type/subtype */
+-    sprintf (buffer, "%s-show-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
++    snprintf (buffer, BUFSIZ, "%s-show-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
+     if ((cp = context_find (buffer)) && *cp != '\0')
+ 	return show_content_aux (ct, serial, alternate, cp, NULL);
+ 
+     /* Check for mhn-show-type */
+-    sprintf (buffer, "%s-show-%s", invo_name, ci->ci_type);
++    snprintf (buffer, BUFSIZ, "%s-show-%s", invo_name, ci->ci_type);
+     if ((cp = context_find (buffer)) && *cp != '\0')
+ 	return show_content_aux (ct, serial, alternate, cp, NULL);
+ 
+--- nmh-0.27/uip/mhstoresbr.c.security	Sat Jul 18 16:05:41 1998
++++ nmh-0.27/uip/mhstoresbr.c	Sat Jul 18 16:13:42 1998
+@@ -72,7 +72,7 @@
+ static int output_content_file (CT, int);
+ static int check_folder (char *);
+ static int output_content_folder (char *, char *);
+-static int parse_format_string (CT, char *, char *, char *);
++static int parse_format_string (CT, char *, char *, int, char *);
+ static void get_storeproc (CT);
+ static int copy_some_headers (FILE *, CT);
+ 
+@@ -95,7 +95,7 @@
+     if (autosw) {
+ 	dir = getcpy (cwd);
+     } else {
+-	sprintf (buffer, "%s-storage", invo_name);
++	snprintf (buffer, BUFSIZ, "%s-storage", invo_name);
+ 	if ((cp = context_find (buffer)) && *cp)
+ 	    dir = getcpy (cp);
+ 	else
+@@ -530,9 +530,9 @@
+     if ((cp = ct->c_storeproc) == NULL || *cp == '\0') {
+ 	CI ci = &ct->c_ctinfo;
+ 
+-	sprintf (buffer, "%s-store-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
++	snprintf (buffer, BUFSIZ, "%s-store-%s/%s", invo_name, ci->ci_type, ci->ci_subtype);
+ 	if ((cp = context_find (buffer)) == NULL || *cp == '\0') {
+-	    sprintf (buffer, "%s-store-%s", invo_name, ci->ci_type);
++	    snprintf (buffer, BUFSIZ, "%s-store-%s", invo_name, ci->ci_type);
+ 	    if ((cp = context_find (buffer)) == NULL || *cp == '\0') {
+ 		cp = ct->c_type == CT_MESSAGE ? "+" : "%m%P.%s";
+ 	    }
+@@ -572,7 +572,7 @@
+     /*
+      * Parse and expand the storage formatting string.
+      */
+-    parse_format_string (ct, cp, buffer, dir);
++    parse_format_string (ct, cp, buffer, BUFSIZ, dir);
+ 
+     /*
+      * If formatting begins with '|' or '!', then pass
+@@ -928,7 +928,7 @@
+  */
+ 
+ static int
+-parse_format_string (CT ct, char *cp, char *buffer, char *dir)
++parse_format_string (CT ct, char *cp, char *buffer, int len, char *dir)
+ {
+     char *bp;
+     CI ci = &ct->c_ctinfo;
+@@ -938,7 +938,7 @@
+      * return (send content to standard output).
+      */
+     if (!cp[1]) {
+-	sprintf (buffer, "-");
++	snprintf(buffer, len, "=");
+ 	return 0;
+     }
+ 
+@@ -951,7 +951,7 @@
+      * appropriate directory.
+      */
+     if (*cp != '/' && *cp != '|' && *cp != '!') {
+-	sprintf (buffer, "%s/", dir[1] ? dir : "");
++	len-=snprintf (buffer, len, "%s/", dir[1] ? dir : "");
+ 	bp += strlen (bp);
+     }
+ 
+@@ -966,8 +966,11 @@
+ 		     * This is only valid for '|' commands.
+ 		     */
+ 		    if (buffer[0] != '|' && buffer[0] != '!') {
+-			*bp++ = *--cp;
+-			*bp = '\0';
++			if (len>1) {
++				*bp++ = *--cp;
++				*bp = '\0';
++				len--;
++			}
+ 			continue;
+ 		    } else {
+ 			char **ap, **ep;
+@@ -975,7 +978,7 @@
+ 
+ 			for (ap = ci->ci_attrs, ep = ci->ci_values;
+ 			         *ap; ap++, ep++) {
+-			    sprintf (bp, "%s%s=\"%s\"", s, *ap, *ep);
++			    len-=snprintf (bp, len, "%s%s=\"%s\"", s, *ap, *ep);
+ 			    bp += strlen (bp);
+ 			    s = " ";
+ 			}
+@@ -984,29 +987,29 @@
+ 
+ 		case 'm':
+ 		    /* insert message number */
+-		    sprintf (bp, "%s", r1bindex (ct->c_file, '/'));
++		    snprintf (bp, len, "%s", r1bindex (ct->c_file, '/'));
+ 		    break;
+ 
+ 		case 'P':
+ 		    /* insert part number with leading dot */
+ 		    if (ct->c_partno)
+-			sprintf (bp, ".%s", ct->c_partno);
++			snprintf (bp, len, ".%s", ct->c_partno);
+ 		    break;
+ 
+ 		case 'p':
+ 		    /* insert part number withouth leading dot */
+ 		    if (ct->c_partno)
+-			strcpy (bp, ct->c_partno);
++			strncpy (bp, ct->c_partno, len);
+ 		    break;
+ 
+ 		case 't':
+ 		    /* insert content type */
+-		    strcpy (bp, ci->ci_type);
++		    strncpy (bp, ci->ci_type, len);
+ 		    break;
+ 
+ 		case 's':
+ 		    /* insert content subtype */
+-		    strcpy (bp, ci->ci_subtype);
++		    strncpy (bp, ci->ci_subtype, len);
+ 		    break;
+ 
+ 		case '%':
+@@ -1014,16 +1017,25 @@
+ 		    goto raw;
+ 
+ 		default:
+-		    *bp++ = *--cp;
+-		    *bp = '\0';
++		    if (len > 1) {
++			*bp++ = *--cp;
++			*bp = '\0';
++			len--;
++		    }
+ 		    continue;
+ 	    }
+-	    bp += strlen (bp);
++	    if (*bp) {
++		len -= strlen (bp);
++		bp += strlen (bp);
++	    }
+ 
+ 	} else {
+ raw:
+-	    *bp++ = *cp;
+-	    *bp = '\0';
++	    if (len > 1) {
++		*bp++ = *cp;
++		*bp = '\0';
++		len--;
++	    }
+ 	}
+     }
+ 
