@@ -37,7 +37,7 @@ email user agent, you'll want to also install exmh to provide a user
 interface for it--nmh only has a command line interface.
 
 %description -l pl
-Nmh jest systemem pocztowym bazuj±cym na systemie MH, w wiêkoszo¶ci
+Nmh jest systemem pocztowym bazuj±cym na systemie MH, w wiêkszo¶ci
 kompatybilnym i mog±cym zast±piæ MH. Nmh nie jest pojedynczym
 programem - sk³ada siê z wielu prostych programów s³u¿±cych do jednej
 czynno¶ci (wysy³ania, odbierania, zapisywania, odczytywania...). Mo¿na
