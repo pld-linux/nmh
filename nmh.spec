@@ -7,6 +7,7 @@ Release:	5
 License:	Freeware
 Group:		Applications/Mail
 Source0:	ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
+# Source0-md5:	caff7fbd5588d08701413fe4eaa87e87
 Patch0:		%{name}-config.patch
 Patch1:		%{name}-buildroot.patch
 Patch2:		%{name}-compat21.patch
