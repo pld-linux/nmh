@@ -98,9 +98,9 @@ fi
 %files
 %defattr(644,root,root,755)
 %doc COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION
-%dir %{_libdir}
+%dir %{_nmhlibdir}
 %dir %{_sysconfdir}
 %config %{_sysconfdir}/*
 %attr(755,root,root) %{_bindir}/*
-%attr(755,root,root) %{_libdir}/*
+%attr(755,root,root) %{_nmhlibdir}/*
 %{_mandir}/*/*
