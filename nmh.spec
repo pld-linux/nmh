@@ -50,7 +50,7 @@ export LIBS LDFLAGS
 rm -rf $RPM_BUILD_ROOT
 %{__make} install DESTDIR=$RPM_BUILD_ROOT
 
-rm -f $RPM_BUILD_ROOT%{_sysconfdir}/nmh/*.old
+rm -f $RPM_BUILD_ROOT%{_sysconfdir}/*.old
 
 gzip -9nf COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION \
 	ZSH.COMPLETION $RPM_BUILD_ROOT%{_mandir}/*/*
@@ -73,8 +73,8 @@ fi
 if [ ! -d %{_bindir}/mh -a ! -L %{_bindir}/mh ] ; then
 	ln -s . %{_bindir}/mh
 fi
-if [ ! -d %{_libdir}/mh -a ! -L %{_libdir}/mh ] ; then
-	ln -s nmh %{_libdir}/mh
+if [ ! -d %{_usrlibdir}/mh -a ! -L %{_usrlibdir}/mh ] ; then
+	ln -s nmh %{_usrlibdir}/mh
 fi
 
 %preun
@@ -89,9 +89,9 @@ fi
 %defattr(644,root,root,755)
 %doc {COPYRIGHT,DIFFERENCES,FAQ,MAIL.FILTERING,README}.gz
 %doc {TODO,VERSION,ZSH.COMPLETION}.gz
-%dir %{_libdir}/nmh
-%dir %{_sysconfdir}/nmh
-%config %{_sysconfdir}/nmh/*
+%dir %{_libdir}
+%dir %{_sysconfdir}
+%config %{_sysconfdir}/*
 %attr(755,root,root) %{_bindir}/*
-%attr(755,root,root) %{_libdir}/nmh/*
+%attr(755,root,root) %{_libdir}/*
 %{_mandir}/*/*
