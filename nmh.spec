@@ -1,18 +1,19 @@
 Summary:	A capable mail handling system with a command line interface
 Name:		nmh
 Provides:	mh
-Version:	0.27
-Release:	9
+Version:	1.0.4
+Release:	1
 Copyright:	freeware
 Group:		Applications/Mail
 Group(de):	Applikationen/Post
 Group(pl):	Aplikacje/Poczta
 Group(pt):	Aplicações/Correio Eletrônico
 Source0:	ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
-Patch0:		%{name}-0.24-config.patch
-Patch1:		%{name}-0.27-buildroot.patch
-Patch2:		%{name}-0.27-security.patch
-Patch3:		%{name}-0.27-compat21.patch
+Patch0:		%{name}-1.0.3-config.patch
+Patch1:		%{name}-1.0.3-buildroot.patch
+#Patch2:		%{name}-0.27-security.patch
+Patch3:		%{name}-1.0.3-compat21.patch
+Patch4:		%{name}-1.0.4-bug7246.patch
 Requires:	smtpdaemon
 Obsoletes:	mh
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
@@ -35,13 +36,14 @@ interface for it--nmh only has a command line interface.
 %setup -q
 %patch0 -p1
 %patch1 -p1
-%patch2 -p1
+#%patch2 -p1
 %patch3 -p1
+%patch4 -p1
 
 %build
 LIBS="-lgdbm"
 export LIBS
-%configure \
+%configure2_13 \
 	--with-editor=/bin/vi
 
 %{__make}
@@ -52,8 +54,8 @@ rm -rf $RPM_BUILD_ROOT
 
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/*.old
 
-gzip -9nf COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION \
-	ZSH.COMPLETION
+gzip -9nf COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION 
+#\	ZSH.COMPLETION
 
 %clean
 rm -rf $RPM_BUILD_ROOT
