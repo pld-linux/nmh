@@ -1,29 +1,20 @@
-# TODO:
-# - update to 1.1RC1 - project moved to savannah.nongnu.org
-#
 Summary:	A capable mail handling system with a command line interface
 Summary(pl):	System obs³ugi poczty z interfejsem z linii poleceñ
 Name:		nmh
-Provides:	mh
-Version:	1.0.4
-Release:	6
+Version:	1.1
+Release:	0.1
 License:	Freeware
 Group:		Applications/Mail
-Source0:	ftp://ftp.math.gatech.edu/pub/nmh/%{name}-%{version}.tar.gz
-# Source0-md5:	caff7fbd5588d08701413fe4eaa87e87
-Patch0:		%{name}-config.patch
-Patch1:		%{name}-buildroot.patch
-Patch2:		%{name}-compat21.patch
-Patch3:		%{name}-bug7246.patch
+Source0:	http://savannah.nongnu.org/download/nmh/%{name}-%{version}.tar.gz
+# Source0-md5:	060647c9c60514a2a86f7f194c830096
+Patch0:		%{name}-DESTDIR.patch
+Patch1:		%{name}-unquote.patch
+URL:		http://savannah.nongnu.org/projects/nmh/
 BuildRequires:	gdbm-devel
 BuildRequires:	ncurses-devel
-Requires:	smtpdaemon
-Requires:	/bin/vi
 Obsoletes:	mh
+Provides:	mh
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
-
-%define		_nmhlibdir	%{_libdir}/nmh
-%define		_sysconfdir	/etc/nmh
 
 %description
 Nmh is an email system based on the MH email system and is intended to
@@ -48,59 +39,41 @@ daj±cego interfejs u¿ytkownika - samo nmh mo¿na obs³ugiwaæ tylko z
 linii poleceñ.
 
 %prep
-%setup -q
+%setup -qn %{name}
 %patch0 -p1
-%patch1 -p1
-%patch2 -p1
-%patch3 -p1
+%patch1 -p0
 
 %build
-%configure2_13 \
-	--with-editor=/bin/vi
-
-%{__make} LIBS="-lgdbm -lgdbm_compat"
-
+%configure \
+	--with-locking=fcntl \
+	--with-mts=sendmail \
+	--enable-pop
+%{__make} \
+	bindir=%{_bindir}/mh \
+	libdir=%{_libdir}/mh \
+	etcdir=%{_sysconfdir}/nmh
+	
 %install
 rm -rf $RPM_BUILD_ROOT
-%{__make} install DESTDIR=$RPM_BUILD_ROOT SETGID_MAIL=
-
-rm -f $RPM_BUILD_ROOT%{_sysconfdir}/*.old
-
+%{__make} install \
+	DESTDIR=$RPM_BUILD_ROOT \
+	SETGID_MAIL= \
+	bindir=%{_bindir}/mh \
+	libdir=%{_libdir}/mh \
+	etcdir=%{_sysconfdir}/nmh
+	
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%post
-if [ ! -d %{_bindir}/mh -a ! -L %{_bindir}/mh ] ; then
-	ln -sf . %{_bindir}/mh
-fi
-if [ ! -d %{_libdir}/mh -a ! -L %{_libdir}/mh ] ; then
-	ln -sf nmh %{_libdir}/mh
-fi
-if [ -d /etc/smrsh -a ! -L /etc/smrsh/slocal ] ; then
-	ln -sf %{_nmhlibdir}/slocal /etc/smrsh/slocal
-fi
-
-%triggerpostun -- mh, nmh <= 0.27-7
-if [ ! -d %{_bindir}/mh -a ! -L %{_bindir}/mh ] ; then
-	ln -sf . %{_bindir}/mh
-fi
-if [ ! -d %{_libdir}/mh -a ! -L %{_libdir}/mh ] ; then
-	ln -sf nmh %{_libdir}/mh
-fi
-
-%preun
-if [ "$1" = "0" ]; then
-	[ ! -L %{_bindir}/mh ] || rm -f %{_bindir}/mh
-	[ ! -L %{_libdir}/mh ] || rm -f %{_libdir}/mh
-	[ ! -d /etc/smrsh -a -L /etc/smrsh/slocal ] || rm -f /etc/smrsh/slocal
-fi
-
 %files
 %defattr(644,root,root,755)
-%doc COPYRIGHT DIFFERENCES FAQ MAIL.FILTERING README TODO VERSION
-%dir %{_nmhlibdir}
-%dir %{_sysconfdir}
-%config %{_sysconfdir}/*
-%attr(755,root,root) %{_bindir}/*
-%attr(755,root,root) %{_nmhlibdir}/*
+%doc COPYRIGHT ChangeLog README docs/{COMP*,FAQ,MAIL*,README.*,TODO}
+%dir %{_bindir}/mh
+%dir %{_libdir}/mh
+%attr(755,root,root) %{_bindir}/mh/*
+%attr(755,root,root) %{_libdir}/mh/*
+
+%dir %{_sysconfdir}/nmh
+%config %{_sysconfdir}/nmh/*
+
 %{_mandir}/*/*
