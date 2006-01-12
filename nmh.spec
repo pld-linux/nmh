@@ -72,6 +72,5 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/mh/*
 %attr(755,root,root) %{_libdir}/mh/*
 %dir %{_sysconfdir}/nmh
-%config %{_sysconfdir}/nmh/*
-
+%config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/nmh/*
 %{_mandir}/*/*
