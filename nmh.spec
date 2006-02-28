@@ -11,8 +11,8 @@ Patch0:		%{name}-DESTDIR.patch
 URL:		http://savannah.nongnu.org/projects/nmh/
 BuildRequires:	gdbm-devel
 BuildRequires:	ncurses-devel
-Obsoletes:	mh
 Provides:	mh
+Obsoletes:	mh
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
@@ -50,7 +50,7 @@ linii poleceñ.
 	bindir=%{_bindir}/mh \
 	libdir=%{_libdir}/mh \
 	etcdir=%{_sysconfdir}/nmh
-	
+
 %install
 rm -rf $RPM_BUILD_ROOT
 
@@ -60,7 +60,7 @@ rm -rf $RPM_BUILD_ROOT
 	bindir=%{_bindir}/mh \
 	libdir=%{_libdir}/mh \
 	etcdir=%{_sysconfdir}/nmh
-	
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
