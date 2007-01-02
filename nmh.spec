@@ -2,12 +2,13 @@ Summary:	A capable mail handling system with a command line interface
 Summary(pl):	System obs³ugi poczty z interfejsem z linii poleceñ
 Name:		nmh
 Version:	1.2
-Release:	2
+Release:	3
 License:	Freeware
 Group:		Applications/Mail
 Source0:	http://savannah.nongnu.org/download/nmh/%{name}-%{version}.tar.gz
 # Source0-md5:	aeebb9bef9ede7232f52c3a3b693eccc
 Patch0:		%{name}-DESTDIR.patch
+Patch1:		%{name}-build.patch
 URL:		http://savannah.nongnu.org/projects/nmh/
 BuildRequires:	gdbm-devel
 BuildRequires:	ncurses-devel
@@ -40,6 +41,7 @@ linii poleceñ.
 %prep
 %setup -q
 %patch0 -p1
+%patch1 -p1
 
 %build
 %configure \
