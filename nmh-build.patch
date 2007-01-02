@@ -1,0 +1,12 @@
+diff -urN nmh-1.2.org/configure.in nmh-1.2/configure.in
+--- nmh-1.2.org/configure.in	2005-12-15 01:45:36.000000000 +0100
++++ nmh-1.2/configure.in	2007-01-02 02:20:48.044606750 +0100
+@@ -548,7 +548,7 @@
+ dnl Checks for network libraries (nsl, socket)
+ AC_CHECK_NETLIBS
+ 
+-termcap_curses_order="termcap curses ncurses"
++termcap_curses_order="tinfo termcap curses ncurses"
+ for lib in $termcap_curses_order; do
+   AC_CHECK_LIB(${lib}, tgetent, [TERMLIB="-l$lib"; break])
+ done
