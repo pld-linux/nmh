@@ -1,5 +1,5 @@
 Summary:	A capable mail handling system with a command line interface
-Summary(pl):	System obs³ugi poczty z interfejsem z linii poleceñ
+Summary(pl.UTF-8):   System obsÅ‚ugi poczty z interfejsem z linii poleceÅ„
 Name:		nmh
 Version:	1.2
 Release:	3
@@ -27,16 +27,16 @@ scripts which utilize nmh commands. If you want to use nmh as a true
 email user agent, you'll want to also install exmh to provide a user
 interface for it--nmh only has a command line interface.
 
-%description -l pl
-Nmh jest systemem pocztowym bazuj±cym na systemie MH, w wiêkszo¶ci
-kompatybilnym i mog±cym zast±piæ MH. Nmh nie jest pojedynczym
-programem - sk³ada siê z wielu prostych programów s³u¿±cych do jednej
-czynno¶ci (wysy³ania, odbierania, zapisywania, odczytywania...). Mo¿na
-swobodnie umieszczaæ polecenia nmh miêdzy innymi poleceniami pow³oki
-lub pisaæ skrypty korzystaj±ce z poleceñ nmh. Je¶li chcesz u¿ywaæ nmh
-jako prawdziwego programu pocztowego, pomy¶l o zainstalowaniu exmh,
-daj±cego interfejs u¿ytkownika - samo nmh mo¿na obs³ugiwaæ tylko z
-linii poleceñ.
+%description -l pl.UTF-8
+Nmh jest systemem pocztowym bazujÄ…cym na systemie MH, w wiÄ™kszoÅ›ci
+kompatybilnym i mogÄ…cym zastÄ…piÄ‡ MH. Nmh nie jest pojedynczym
+programem - skÅ‚ada siÄ™ z wielu prostych programÃ³w sÅ‚uÅ¼Ä…cych do jednej
+czynnoÅ›ci (wysyÅ‚ania, odbierania, zapisywania, odczytywania...). MoÅ¼na
+swobodnie umieszczaÄ‡ polecenia nmh miÄ™dzy innymi poleceniami powÅ‚oki
+lub pisaÄ‡ skrypty korzystajÄ…ce z poleceÅ„ nmh. JeÅ›li chcesz uÅ¼ywaÄ‡ nmh
+jako prawdziwego programu pocztowego, pomyÅ›l o zainstalowaniu exmh,
+dajÄ…cego interfejs uÅ¼ytkownika - samo nmh moÅ¼na obsÅ‚ugiwaÄ‡ tylko z
+linii poleceÅ„.
 
 %prep
 %setup -q
