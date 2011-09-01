@@ -2,7 +2,7 @@ Summary:	A capable mail handling system with a command line interface
 Summary(pl.UTF-8):	System obsługi poczty z interfejsem z linii poleceń
 Name:		nmh
 Version:	1.2
-Release:	6
+Release:	7
 License:	Freeware
 Group:		Applications/Mail
 Source0:	http://savannah.nongnu.org/download/nmh/%{name}-%{version}.tar.gz
